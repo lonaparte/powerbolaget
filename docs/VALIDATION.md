@@ -61,3 +61,13 @@ An actual Linux/amd64 build installed the pinned dependencies successfully and p
 The Compose service became healthy with a host-port override of 8094. HTTP checks verified the English page, version 0.0.1 health response, native OpenDSS plan validation, four simulation intervals, a checkpoint and replay export. After `docker compose down` followed by container recreation using the same volume, the browser session retained its step, revision, metrics and checkpoint. The temporary verification containers and volume were removed afterward.
 
 Raw Docker evidence is in `results/docker-validation.json` and `results/docker-pytest.txt`. macOS and Windows were not separately tested; their documented path uses Docker Desktop with Linux containers. Packaging includes the Docker deployment files.
+
+## Linux runtime cleanup verification (2026-10-12)
+
+The native Windows launcher has been removed from the source tree and source packaging. Runtime initialization now rejects non-Linux hosts with an English instruction to use Linux containers. Windows runs the application through Docker Desktop. Platform-neutral system and monospace fonts replace Windows-specific frontend fonts.
+
+The dependency lock was regenerated on Linux. It contains 26 runtime/test packages and excludes colorama, which pytest requires only on native Windows. The other package versions remain unchanged. Original third-party license texts and historical audit evidence remain preserved.
+
+The rebuilt Linux image passed all 43 model/API tests in 13.68 seconds, with the existing Starlette/AnyIO warning. Desktop overview, planner and climate views, plus mobile overview and planner views at 390 px, passed browser checks with no console errors or horizontal page overflow. Simulated non-Linux platform imports verified the native runtime restriction. Packaging was checked for the absence of Windows launch scripts.
+
+Raw evidence is in `results/linux-validation.json` and `results/linux-pytest.txt`.

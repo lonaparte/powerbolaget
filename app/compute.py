@@ -1,4 +1,4 @@
-"""Serialize native DSS in a persistent main-thread worker on Windows and Linux."""
+"""Serialize native DSS in a persistent main-thread worker on Linux."""
 import json
 from pathlib import Path
 from queue import Queue, Empty

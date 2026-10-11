@@ -4,7 +4,7 @@
   "project_name": "Powerbolaget",
   "project_version": "0.0.1",
   "project_license": "MIT (included in release; original copyright retained)",
-  "current_python_count": 27,
+  "current_python_count": 26,
   "runtime_python_count": 18,
   "python": [
     {
@@ -166,7 +166,7 @@
     {
       "name": "colorama",
       "version": "0.4.6",
-      "scope": "current-test-tool",
+      "scope": "legacy-only",
       "license": "BSD-3-Clause",
       "evidence": [
         {
@@ -1612,5 +1612,6 @@
       "license": "MinGW-w64 winpthreads MIT/BSD-style notices; exact wheel build notice not included in wheel metadata",
       "status": "binary redistributor must retain exact MinGW runtime notices"
     }
-  ]
+  ],
+  "linux_dependency_update": "2026-10-12: regenerated the pinned closure on Linux; colorama is retained as historical license evidence only."
 }

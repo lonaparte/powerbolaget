@@ -4,7 +4,7 @@ A power-supply and offshore wind-farm planning game set in an unnamed Baltic coa
 
 ## Deploy with Docker
 
-Linux is the primary deployment platform. Install Docker Engine and the Docker Compose plugin on Linux. On macOS or Windows, use Docker Desktop with Linux containers. The same Compose files run the Python 3.12 application and native OpenDSS dependencies inside a Linux container; no host Python installation is required.
+Linux is the only supported native runtime. Install Docker Engine and the Docker Compose plugin on Linux. Windows must run Powerbolaget through Docker Desktop with Linux containers; native Windows execution is unsupported. On macOS, use Docker Desktop with Linux containers. The same Compose files run the Python 3.12 application and native OpenDSS dependencies inside a Linux container; no host Python installation is required.
 
 ```sh
 git clone https://github.com/lonaparte/powerbolaget.git

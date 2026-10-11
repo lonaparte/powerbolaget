@@ -15,7 +15,6 @@ anyio 4.15.1 | MIT | current-runtime
 certifi 2026.7.22 | MPL-2.0 | current-test-tool
 cffi 2.1.1 | MIT-0 | current-runtime
 click 8.5.0 | BSD-3-Clause | current-runtime
-colorama 0.4.6 | BSD-3-Clause | current-test-tool
 dss-python 0.15.7 | BSD-3-Clause | current-runtime
 dss-python-backend 0.14.5 | BSD-3-Clause (wrapper; native components have separate licenses) | current-runtime
 fastapi 0.115.12 | MIT | current-runtime
@@ -39,6 +38,7 @@ typing-inspection 0.4.4 | MIT | current-runtime
 uvicorn 0.34.2 | BSD-3-Clause | current-runtime
 
 Retained legacy Python packages (not used by current Powerbolaget):
+colorama 0.4.6 | BSD-3-Clause
 blosc2 4.14.1 | BSD-3-Clause
 formulaic 1.2.2 | MIT
 h2 4.4.1 | MIT

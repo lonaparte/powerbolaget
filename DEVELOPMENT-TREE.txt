@@ -112,6 +112,8 @@ Powerbolaget-0.0.1/
 │   ├── docker-pytest.txt
 │   ├── docker-validation.json
 │   ├── license-inventory.json
+│   ├── linux-pytest.txt
+│   ├── linux-validation.json
 │   ├── pytest.txt
 │   └── rename-validation.json
 ├── tests/
@@ -140,5 +142,4 @@ Powerbolaget-0.0.1/
 ├── README.md
 ├── requirements.lock
 ├── run.py
-├── start.ps1
 └── THIRD-PARTY-NOTICES.txt

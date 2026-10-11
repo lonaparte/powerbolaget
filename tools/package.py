@@ -20,7 +20,7 @@ destination.mkdir(parents=True, exist_ok=False)
 
 folders = ['app', 'web', 'docs', 'tests', 'tools', 'screenshots', 'examples', 'results', 'licenses']
 files = ['README.md', 'LICENSE', 'Dockerfile', 'compose.yaml', '.dockerignore',
-         'start.ps1', 'run.py', 'requirements.lock', 'pytest.ini',
+         'run.py', 'requirements.lock', 'pytest.ini',
          'LICENSE-REVIEW.txt', 'THIRD-PARTY-NOTICES.txt', 'DEVELOPMENT-TREE.txt']
 for name in files:
     shutil.copy2(root / name, destination / name)
