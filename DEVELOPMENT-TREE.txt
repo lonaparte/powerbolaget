@@ -109,13 +109,11 @@ Powerbolaget-0.0.1/
 │   ├── annual-replay.json
 │   ├── annual-validation.json
 │   ├── browser-validation.json
+│   ├── docker-pytest.txt
+│   ├── docker-validation.json
 │   ├── license-inventory.json
 │   ├── pytest.txt
 │   └── rename-validation.json
-├── screenshots/
-│   ├── 01-overview-en.jpg
-│   ├── 02-planner-en.jpg
-│   └── 03-climate-en.jpg
 ├── tests/
 │   ├── endurance.py
 │   ├── test_api.py
@@ -132,7 +130,10 @@ Powerbolaget-0.0.1/
 │   ├── planner.css
 │   ├── planner.js
 │   └── style.css
+├── .dockerignore
+├── compose.yaml
 ├── DEVELOPMENT-TREE.txt
+├── Dockerfile
 ├── LICENSE
 ├── LICENSE-REVIEW.txt
 ├── pytest.ini

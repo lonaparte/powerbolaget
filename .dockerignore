@@ -1,0 +1,17 @@
+**
+!Dockerfile
+!requirements.lock
+!app/
+!app/**
+!web/
+!web/**
+!tests/
+!tests/**
+!pytest.ini
+!LICENSE
+!THIRD-PARTY-NOTICES.txt
+!licenses/
+!licenses/**
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/

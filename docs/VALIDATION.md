@@ -51,3 +51,13 @@ Earlier browser acceptance used Baltic One with a freely added T02→T04 ring ca
 Construction quantities, vessel productivity, manufacturing lead times, wave proxies and costs are not site-calibrated. Custom rings lack full directional protection coordination and N-1 design; power-flow previews cover the current condition only. Protection uses discrete events rather than electromagnetic transients. City load is a demonstration district and weather is synthetic. See [MODEL.md](MODEL.md).
 
 The source release includes the complete MIT `LICENSE`, original copyright, third-party notices and license texts. Development documentation and tools use English. Historical screenshots that contained the previous language or named location have been replaced by current English captures. The clean packaging tool produces `Powerbolaget-0.0.1/` without Git metadata, runtime saves, caches or third-party binaries.
+
+## Docker deployment verification (2026-10-12)
+
+The repository now includes a portable `Dockerfile`, `compose.yaml` and `.dockerignore`. Docker Engine on Linux builds the same Linux image used by Docker Desktop on macOS and Windows. The image runs as UID 10001, exposes container port 8082, and uses one application worker with `/data` backed by a named save volume.
+
+An actual Linux/amd64 build installed the pinned dependencies successfully and passed `pip check`. Compose configuration validation passed. The documented disposable-container test command passed all 43 model/API tests in 12.60 seconds, with the existing Starlette/AnyIO deprecation warning.
+
+The Compose service became healthy with a host-port override of 8094. HTTP checks verified the English page, version 0.0.1 health response, native OpenDSS plan validation, four simulation intervals, a checkpoint and replay export. After `docker compose down` followed by container recreation using the same volume, the browser session retained its step, revision, metrics and checkpoint. The temporary verification containers and volume were removed afterward.
+
+Raw Docker evidence is in `results/docker-validation.json` and `results/docker-pytest.txt`. macOS and Windows were not separately tested; their documented path uses Docker Desktop with Linux containers. Packaging includes the Docker deployment files.

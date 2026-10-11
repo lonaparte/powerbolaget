@@ -2,17 +2,38 @@
 
 A power-supply and offshore wind-farm planning game set in an unnamed Baltic coastal city. Wind supplies the city, batteries balance energy, and the external grid provides backup. The existing farm has 20 MW of capacity; expand it or plan up to four custom plants.
 
-## Start
+## Deploy with Docker
 
-Run `start.ps1` on Windows and open http://127.0.0.1:8082. For a first installation, use Python 3.12:
+Linux is the primary deployment platform. Install Docker Engine and the Docker Compose plugin on Linux. On macOS or Windows, use Docker Desktop with Linux containers. The same Compose files run the Python 3.12 application and native OpenDSS dependencies inside a Linux container; no host Python installation is required.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.lock
-.\.venv\Scripts\python.exe run.py
+```sh
+git clone https://github.com/lonaparte/powerbolaget.git
+cd powerbolaget
+docker compose up -d --build
 ```
 
-On Linux or macOS, use `.venv/bin/python` for the same commands. The server listens on loopback only. `data/coastal.sqlite3` stores separate browser scenarios; run one server per data directory. Set `PORT` to choose another port or `COASTAL_DATA` to use a separate data directory.
+Open http://127.0.0.1:8082. The service publishes port 8082 on host loopback and runs one application worker. Check startup and logs with:
+
+```sh
+docker compose ps
+docker compose logs -f game
+```
+
+The `saves` named volume stores browser scenarios and checkpoints in `/data/coastal.sqlite3`. It survives container restarts, rebuilds and `docker compose down`. Keep one application instance per save volume. To stop or restart the service:
+
+```sh
+docker compose down
+docker compose up -d
+```
+
+To change the host port, create a `.env` file beside `compose.yaml` containing `POWERBOLAGET_PORT=8083`, then run `docker compose up -d`. The container continues listening on port 8082; open http://127.0.0.1:8083 on the host.
+
+To update the application:
+
+```sh
+git pull --ff-only
+docker compose up -d --build
+```
 
 ## Plan, build and operate
 
@@ -35,16 +56,23 @@ Construction uses an original quantity and critical-path approximation. Producti
 
 ## Validate
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+Run the Python model and API tests in a disposable container using the same image:
+
+```sh
+docker compose run --rm --no-deps game python -m pytest -q -p no:cacheprovider
+```
+
+For frontend development, JavaScript syntax checks can be run from a Linux shell with Node.js installed:
+
+```sh
 node --check web/app.js
 node --check web/planner.js
 ```
 
-The model/API suite covers planning, scheduling, continuous climate, commissioning, protection and save handling. `tests/endurance.py` validates all 35,040 intervals of a simulated year. See [Validation records](docs/VALIDATION.md), raw evidence in `results/`, and current English screenshots in `screenshots/`.
+The model/API suite covers planning, scheduling, continuous climate, commissioning, protection and save handling. `tests/endurance.py` validates all 35,040 intervals of a simulated year. See [Validation records](docs/VALIDATION.md), raw evidence in `results/`.
 
 ## License and release folder
 
 Original project code uses the MIT License. The complete root `LICENSE` retains the original copyright. Dependencies retain their own licenses, including the OpenDSSDirect.py Alliance terms and native KLU, Eigen and NumPy components. See `LICENSE-REVIEW.txt`, hashes and provenance in `results/license-inventory.json`, and original texts in `licenses/`.
 
-`DEVELOPMENT-TREE.txt` lists the source release. `tools/package.py --output <new-folder-path>` creates a clean `Powerbolaget-0.0.1/` folder for upload without an archive. The folder includes source, documentation, examples, screenshots and licenses and excludes Git metadata, saves, backups, virtual environments and third-party binaries.
+`DEVELOPMENT-TREE.txt` lists the source release. `tools/package.py --output <new-folder-path>` creates a clean `Powerbolaget-0.0.1/` folder for upload without an archive. The folder includes source, Docker deployment files, documentation, examples, any available screenshots and licenses and excludes Git metadata, saves, backups, virtual environments and third-party binaries.

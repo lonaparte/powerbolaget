@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-12",
+  "version": "0.0.1",
+  "platform": "linux/amd64",
+  "build": "passed",
+  "compose_config": "passed",
+  "health": "healthy",
+  "runtime_uid": 10001,
+  "port_override": 8094,
+  "native_plan_validation": "passed",
+  "simulation_steps": 4,
+  "checkpoint_export": "passed",
+  "container_recreation_persistence": "passed",
+  "dependency_check": "passed",
+  "pytest": {
+    "passed": 43,
+    "warnings": 1,
+    "seconds": 12.6
+  },
+  "build_ca": "Session CA bundle supplied through an optional BuildKit secret; not included in the image."
+}
