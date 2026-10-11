@@ -1,0 +1,48 @@
+Powerbolaget 0.0.1 — Third-party notices
+
+Original project code remains subject to the existing MIT LICENSE, including
+Copyright (c) 2026 PowerGame contributors. This notice does not relicense dependencies.
+
+Runtime packages: FastAPI, Uvicorn, OpenDSSDirect.py, DSS-Python,
+DSS-Python-Backend, NumPy, Pydantic and their dependencies.
+Exact versions, original notice paths, source URLs and SHA-256 hashes are
+listed in results/license-inventory.json. Original license texts are under licenses/.
+
+OpenDSSDirect.py 0.9.4: Copyright 2017 Alliance for Sustainable Energy, LLC.
+Its custom license includes a U.S. Government rights notice, research-entity
+redistribution terms and modified-software naming requirements. The complete,
+unmodified license is preserved in licenses/opendssdirect-py/LICENSE.
+
+The DSS C-API backend derives from EPRI OpenDSS. Its BSD licenses do not
+replace the separate licenses for KLUSolveX/KLU/BTF (LGPL), Eigen (MPL and
+build-dependent components), Lazarus utilities (modified LGPL), or compiler
+runtime libraries. Native source notices and build provenance are preserved
+under licenses/native/. NumPy's complete wheel license includes the notices
+for OpenBLAS, LAPACK, GCC runtimes and libquadmath.
+
+This source release contains no third-party executables, DLLs, Python
+interpreter, virtual environment, Godot runtime, node_modules or user saves.
+Dependencies are obtained through the pinned requirements.lock.
+An installer that bundles native binaries needs its own exact-binary notice
+and corresponding-source / relinking review, including MinGW and Free Pascal
+runtime notices not fully inventoried by Python wheel metadata.
+
+Baltic coastal climate calibration:
+NASA POWER, 2001-2020 gridded monthly climatology at 55.6761 N, 12.5683 E.
+Parameters WS10M, T2M, ALLSKY_SFC_SW_DWN.
+The stored monthly values calibrate continuous seasonal functions; the game
+generates synthetic weather using smooth seeded disturbances.
+https://power.larc.nasa.gov/docs/services/api/temporal/climatology/
+The climate function and construction scheduler are original project code.
+NREL turbine reports, SAM documentation and ORBIT scheduling documentation
+are references only; OpenFAST, SAM and ORBIT are not imported or bundled.
+
+Retained legacy project (outside this source release): Godot 4.4.1 (MIT plus
+its third-party copyright file), UrbanSim 3.3 (BSD-3-Clause), pandas and other
+legacy Python packages, and jsdom 26.0.0 (MIT, development tests).
+See review/powergame/NOTICE.md and review/powergame/LICENSES/ in the workspace.
+A separate inventory of legacy dependencies is included for audit clarity.
+
+For the English summary and project-license recommendations, see
+LICENSE-REVIEW.txt. The release includes the complete MIT LICENSE at its root,
+with the original copyright notice retained.

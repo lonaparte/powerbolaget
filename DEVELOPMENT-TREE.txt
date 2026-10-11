@@ -1,0 +1,143 @@
+Powerbolaget 0.0.1 development tree / 2026-10-12
+Project root: .
+Lists source, tests, configuration, documentation, screenshots, examples and license evidence.
+Collapses installed dependencies, runtime data and backups; ignores Python, pytest and tool caches.
+Screenshots show the current English interface.
+
+Powerbolaget-0.0.1/
+├── app/
+│   ├── __init__.py
+│   ├── baltic-coastal-climatology.json
+│   ├── climate.py
+│   ├── compute.py
+│   ├── construction.py
+│   ├── engine.py
+│   ├── errors.py
+│   ├── main.py
+│   ├── network.py
+│   ├── parameters.py
+│   ├── planning.py
+│   ├── protection.py
+│   ├── wind.py
+│   └── worker.py
+├── docs/
+│   ├── MODEL.md
+│   └── VALIDATION.md
+├── examples/
+│   ├── baltic-one-day-140.json
+│   └── expanded-day-182.json
+├── licenses/
+│   ├── annotated-types/
+│   │   └── LICENSE
+│   ├── anyio/
+│   │   └── LICENSE
+│   ├── certifi/
+│   │   └── LICENSE
+│   ├── cffi/
+│   │   └── LICENSE
+│   ├── click/
+│   │   └── LICENSE.txt
+│   ├── colorama/
+│   │   └── LICENSE.txt
+│   ├── dss-python/
+│   │   └── LICENSE
+│   ├── dss-python-backend/
+│   │   └── LICENSE
+│   ├── fastapi/
+│   │   └── LICENSE
+│   ├── h11/
+│   │   └── LICENSE.txt
+│   ├── httpcore/
+│   │   └── LICENSE.md
+│   ├── httpx/
+│   │   └── LICENSE.md
+│   ├── idna/
+│   │   └── LICENSE.md
+│   ├── iniconfig/
+│   │   └── LICENSE
+│   ├── native/
+│   │   ├── DSS-CAPI-0.14.5-builds.yml
+│   │   ├── DSS-CAPI-0.14.5-LICENSE.txt
+│   │   ├── KLUSolveX-1.0.0a1-LICENSE.txt
+│   │   ├── KLUSolveX-1.0.0a1-NOTICES.txt
+│   │   ├── Lazarus-COPYING.LGPL.txt
+│   │   ├── Lazarus-COPYING.modifiedLGPL.txt
+│   │   ├── Lazarus-NOTICE.txt
+│   │   └── OpenDSS-EPRI-LICENSE.txt
+│   ├── numpy/
+│   │   ├── embedded/
+│   │   │   └── numpy/
+│   │   │       ├── core/
+│   │   │       │   └── include/
+│   │   │       │       └── numpy/
+│   │   │       │           └── random/
+│   │   │       │               └── LICENSE.txt
+│   │   │       ├── ma/
+│   │   │       │   └── LICENSE
+│   │   │       └── random/
+│   │   │           └── LICENSE.md
+│   │   ├── LICENSE
+│   │   ├── LICENSE.md
+│   │   └── LICENSE.txt
+│   ├── opendssdirect-py/
+│   │   └── LICENSE
+│   ├── packaging/
+│   │   ├── LICENSE
+│   │   ├── LICENSE.APACHE
+│   │   └── LICENSE.BSD
+│   ├── pluggy/
+│   │   └── LICENSE
+│   ├── pycparser/
+│   │   └── LICENSE
+│   ├── pydantic/
+│   │   └── LICENSE
+│   ├── pydantic-core/
+│   │   └── LICENSE
+│   ├── pygments/
+│   │   └── LICENSE
+│   ├── pytest/
+│   │   └── LICENSE
+│   ├── starlette/
+│   │   └── LICENSE.md
+│   ├── typing-extensions/
+│   │   └── LICENSE
+│   ├── typing-inspection/
+│   │   └── LICENSE
+│   └── uvicorn/
+│       └── LICENSE.md
+├── results/
+│   ├── annual-replay.json
+│   ├── annual-validation.json
+│   ├── browser-validation.json
+│   ├── license-inventory.json
+│   ├── pytest.txt
+│   └── rename-validation.json
+├── screenshots/
+│   ├── 01-overview-en.jpg
+│   ├── 02-planner-en.jpg
+│   └── 03-climate-en.jpg
+├── tests/
+│   ├── endurance.py
+│   ├── test_api.py
+│   ├── test_model.py
+│   └── test_planning_climate.py
+├── tools/
+│   ├── development_tree.py
+│   ├── license_inventory.py
+│   ├── lock_runtime.py
+│   └── package.py
+├── web/
+│   ├── app.js
+│   ├── index.html
+│   ├── planner.css
+│   ├── planner.js
+│   └── style.css
+├── DEVELOPMENT-TREE.txt
+├── LICENSE
+├── LICENSE-REVIEW.txt
+├── pytest.ini
+├── README.md
+├── requirements.lock
+├── run.py
+├── start.ps1
+└── THIRD-PARTY-NOTICES.txt

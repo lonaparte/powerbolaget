@@ -1,0 +1,34 @@
+{
+  "steps": 35040,
+  "days": 365.0,
+  "seconds": 31.051703200209886,
+  "max_residual_kw": 0.05142964188528665,
+  "max_loading_pct": 88.13741858760471,
+  "soc_range": [
+    0.22499999999999998,
+    0.9
+  ],
+  "annual_energy_error_mwh": 0.046197086884307126,
+  "totals": {
+    "wind_mwh": 63467.166734657534,
+    "demand_mwh": 88706.13323444506,
+    "served_mwh": 88706.13323444506,
+    "import_mwh": 35458.629725435174,
+    "export_mwh": 7435.626249606563,
+    "loss_mwh": 2268.7739927858606,
+    "curtailment_mwh": 8227.66808228299,
+    "unserved_mwh": 0.0,
+    "wind_direct_mwh": 54203.88952632296,
+    "auxiliary_mwh": 437.9999999997386,
+    "battery_loss_mwh": 77.21678616859778,
+    "battery_charge_mwh": 981.157986844358,
+    "battery_discharge_mwh": 907.6912006757628
+  },
+  "upgrades": [
+    "collector_upgrade",
+    "battery_phase2",
+    "wind_phase2"
+  ],
+  "cash": 60493966.96228802,
+  "direct_wind_share_pct": 61.10500768088412
+}

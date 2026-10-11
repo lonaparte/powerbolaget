@@ -1,0 +1,50 @@
+# Powerbolaget 0.0.1
+
+A power-supply and offshore wind-farm planning game set in an unnamed Baltic coastal city. Wind supplies the city, batteries balance energy, and the external grid provides backup. The existing farm has 20 MW of capacity; expand it or plan up to four custom plants.
+
+## Start
+
+Run `start.ps1` on Windows and open http://127.0.0.1:8082. For a first installation, use Python 3.12:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.lock
+.\.venv\Scripts\python.exe run.py
+```
+
+On Linux or macOS, use `.venv/bin/python` for the same commands. The server listens on loopback only. `data/coastal.sqlite3` stores separate browser scenarios; run one server per data directory. Set `PORT` to choose another port or `COASTAL_DATA` to use a separate data directory.
+
+## Plan, build and operate
+
+1. Select **Plan a wind farm**, enter a turbine count, or add turbines and junctions individually.
+2. Select a node to edit its position, rated power, hub height, rotor diameter, power curve and transformer. Select a cable to edit length, R/X/C, ampacity and switch state. Drag nodes and wire freely, or start from radial, star or ring templates. Moving a node preserves cable lengths; **Recalculate lengths** updates them explicitly.
+3. Select the substation to configure 35/66 kV collection, the site transformer and additional onshore storage. Configure vessels, engineering and electrical teams, supply lines, water depth and port distance.
+4. Select **Validate & schedule**. The system checks connectivity and real OpenDSS AC power flow, then calculates the critical path and commissioning date from quantities, dependencies, resources and hourly weather windows. Construction duration cannot be entered manually.
+5. Approve construction when funds are sufficient. Approval freezes the plan and charges its cost. The plant generates no power during construction and joins the network at its calculated commissioning time. Select it in the farm menu to inspect topology, cable loading and turbine output.
+6. **Coastal weather** shows wind, temperature, irradiance, daylight and seven days of simulated weather. Continuous functions and smooth seeded disturbances generate conditions; monthly data calibrate coefficients. Weather remains continuous at midnight and is reproducible from the seed.
+
+The application, API messages and development documentation use English. The default four-turbine 5 MW plan, seed 42, January 1 start and default resources produce a 133-day schedule. The reference Baltic One plan adds a ring cable, a 110 m hub and 2 MW / 8 MWh storage and produces a 138-day schedule. Changes to quantities, resources or start date recalculate these results.
+
+Actions autosave. Checkpoints and JSON command replays are supported. A scenario lasts 365 days; projects cannot be approved if they finish after that horizon. Save identifiers and the replay format remain compatible with earlier versions. Old replays use the current weather and scheduling model, so historical numerical results can differ.
+
+## Model scope
+
+This is a reviewable teaching and planning model. OpenDSS constrains currents, losses, voltages and transformer capacity; battery energy is conserved across intervals. NASA POWER 2001–2020 gridded climatology calibrates the Baltic coastal climate functions. City demand represents a demonstration district rather than measured whole-city consumption.
+
+Construction uses an original quantity and critical-path approximation. Productivity, manufacturing lead times, vessel prices and wave relationships are scenario assumptions. ORBIT is a methodological reference, not an imported library. Custom rings participate in power flow, but individual cable directional protection is not implemented. Fault controls target the six original fault locations. Batteries aggregate at the shared onshore bus; grid-following storage does not support independent islanding or black start. See [Model documentation](docs/MODEL.md).
+
+## Validate
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+node --check web/app.js
+node --check web/planner.js
+```
+
+The model/API suite covers planning, scheduling, continuous climate, commissioning, protection and save handling. `tests/endurance.py` validates all 35,040 intervals of a simulated year. See [Validation records](docs/VALIDATION.md), raw evidence in `results/`, and current English screenshots in `screenshots/`.
+
+## License and release folder
+
+Original project code uses the MIT License. The complete root `LICENSE` retains the original copyright. Dependencies retain their own licenses, including the OpenDSSDirect.py Alliance terms and native KLU, Eigen and NumPy components. See `LICENSE-REVIEW.txt`, hashes and provenance in `results/license-inventory.json`, and original texts in `licenses/`.
+
+`DEVELOPMENT-TREE.txt` lists the source release. `tools/package.py --output <new-folder-path>` creates a clean `Powerbolaget-0.0.1/` folder for upload without an archive. The folder includes source, documentation, examples, screenshots and licenses and excludes Git metadata, saves, backups, virtual environments and third-party binaries.
