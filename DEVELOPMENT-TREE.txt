@@ -125,10 +125,13 @@ Powerbolaget-0.0.1/
 │   ├── development_tree.py
 │   ├── license_inventory.py
 │   ├── lock_runtime.py
-│   └── package.py
+│   ├── package.py
+│   └── pixel_font.py
 ├── web/
 │   ├── app.js
 │   ├── index.html
+│   ├── pixel-font.woff
+│   ├── pixel.js
 │   ├── planner.css
 │   ├── planner.js
 │   └── style.css
