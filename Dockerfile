@@ -8,14 +8,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     COASTAL_DATA=/data
 
 WORKDIR /app
-COPY requirements.lock ./
-# The optional CA bundle supports builds behind a trusted HTTPS proxy.
+COPY requirements.lock pyproject.toml ./
+COPY tools/deps.py ./tools/
+# The same command installs dependencies outside Docker. The optional CA bundle supports builds behind a trusted HTTPS proxy.
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
-    python -m pip install --no-cache-dir -r requirements.lock \
-    && python -m pip check
+    PIP_NO_CACHE_DIR=1 python tools/deps.py install
 
 COPY app ./app
+RUN python tools/deps.py check
 COPY web ./web
 COPY tests ./tests
 COPY pytest.ini LICENSE THIRD-PARTY-NOTICES.txt ./

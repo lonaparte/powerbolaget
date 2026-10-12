@@ -58,6 +58,19 @@ This is a reviewable teaching and planning model. OpenDSS constrains currents, l
 
 Construction uses an original quantity and critical-path approximation. Productivity, manufacturing lead times, vessel prices and wave relationships are scenario assumptions. ORBIT is a methodological reference, not an imported library. Custom rings participate in power flow, but individual cable directional protection is not implemented. Fault controls target the six original fault locations. Batteries aggregate at the shared onshore bus; grid-following storage does not support independent islanding or black start. See [Model documentation](docs/MODEL.md).
 
+## Dependencies and electrical solvers
+
+External Python dependencies are declared once, by role, in `pyproject.toml` (`web`, `solvers`, `test`); `requirements.lock` pins the complete set for Python 3.12 on Linux. One command installs them, and the Docker image runs the same command:
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python tools/deps.py install
+```
+
+It installs the pinned set, runs `pip check` and solves a test feeder with every electrical backend. `python tools/deps.py check` repeats the backend check; `python tools/deps.py lock` re-pins `requirements.lock` after a group changes.
+
+Electrical calculation libraries are used only through `app/solvers/`. `app/solvers/model.py` defines the backend-neutral network description and the solver contract: element switching, generator and load setpoints, AC power flow, bus voltages, line and transformer flows, losses, source power and short circuit. `app/solvers/opendss.py` adapts OpenDSSDirect.py and is the only module that imports it; game code in `app/network.py` describes the grid and calls the contract. To add a library, add it to the `solvers` group, install it in a Python 3.12 environment, run `python tools/deps.py lock`, write `app/solvers/<name>.py` with a `Backend` class and register it in `app/solvers/__init__.py`. `tests/test_solvers.py` fails if a calculation library is imported elsewhere in `app/` and checks every registered backend against the same contract.
+
 ## Validate
 
 Run the Python model and API tests in a disposable container using the same image:
@@ -74,7 +87,7 @@ node --check web/planner.js
 node --check web/pixel.js
 ```
 
-The model/API suite covers planning, scheduling, continuous climate, commissioning, protection and save handling. `tests/endurance.py` validates all 35,040 intervals of a simulated year. See [Validation records](docs/VALIDATION.md), raw evidence in `results/`.
+The model/API suite covers planning, scheduling, continuous climate, commissioning, protection, save handling and the solver boundary. `tests/endurance.py` validates all 35,040 intervals of a simulated year. See [Validation records](docs/VALIDATION.md), raw evidence in `results/`.
 
 ## License and release folder
 

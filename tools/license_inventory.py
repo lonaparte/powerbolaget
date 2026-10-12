@@ -9,6 +9,7 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 import hashlib,json,re
 import httpx
+from deps import groups
 ROOT=Path(__file__).resolve().parents[1]
 WORK=ROOT.parent
 OUT=ROOT/'licenses';OUT.mkdir(exist_ok=True)
@@ -24,7 +25,7 @@ def closure(roots):
             if r.marker is None or r.marker.evaluate({'extra':''}):pending.append(r.name)
     return found
 
-runtime=closure(['fastapi','uvicorn','opendssdirect.py'])
+runtime=closure(groups('web','solvers'))
 current={canonicalize_name(s.split('==')[0]) for s in (ROOT/'requirements.lock').read_text(encoding='utf-8').splitlines() if '==' in s}
 legacy_lock=WORK/'review/powergame/backend/requirements.lock'
 legacy={canonicalize_name(s.split('==')[0]) for s in legacy_lock.read_text(encoding='utf-8').splitlines() if '==' in s} if legacy_lock.exists() else set()
