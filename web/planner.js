@@ -83,7 +83,7 @@ function plSchedule(s){if(!s)return '<p class="fine">No phase schedule was saved
 async function plValidate(){
  if(PL.checking||!Array.from($('plannerDialog').querySelectorAll('input')).every(el=>el.reportValidity()))return;PL.checking=true;plSummary();$('plResult').innerHTML='<p>Checking topology, AC power flow and construction windows…</p>';
  const fingerprint=JSON.stringify(PL.plan);
- try{const r=await api('/plan/validate',{revision:game.revision,plan:PL.plan});if(JSON.stringify(PL.plan)!==fingerprint)return;PL.report=r;
+ try{const r=await signed('/plan/validate',{plan:PL.plan});if(JSON.stringify(PL.plan)!==fingerprint)return;PL.report=r;
   $('plResult').innerHTML=`<div class="pl-validation ${r.errors.length?'invalid':''}">${r.errors.length?'Validation failed':'Topology & AC power flow validated'} · ${n(r.capacity_mw,1)} MW · ${r.topology}</div>${r.errors.map(e=>`<p class="bad">${esc(e)}</p>`).join('')}${r.warnings.map(e=>`<p class="notice">${esc(e)}</p>`).join('')}<div class="row"><span>Total investment (including vessels)</span><b>${money(r.cost)}</b></div><div class="row"><span>Available funds</span><b class="${r.affordable?'':'bad'}">${money(game.cash)}</b></div>${!r.affordable?'<p class="bad">Insufficient funds. Save the draft, or reduce its size and recalculate.</p>':''}${plSchedule(r.schedule)}`;
  }catch(e){$('plResult').innerHTML=`<p class="bad">${esc(e.message)}</p>`;PL.report=null;}finally{PL.checking=false;plSummary();}
 }

@@ -19,7 +19,7 @@ docker compose ps
 docker compose logs -f game
 ```
 
-The `saves` named volume stores browser scenarios and checkpoints in `/data/coastal.sqlite3`. It survives container restarts, rebuilds and `docker compose down`. Keep one application instance per save volume. To stop or restart the service:
+Saves live in each player's browser, not on the server. The server signs every game state it returns and only computes on states carrying its signature. The `saves` named volume keeps just that signing key, `/data/state.key`, across restarts, rebuilds and `docker compose down`. If the key is lost or replaced, browsers rebuild their saves from the recorded commands automatically. To run several instances, give them the same key through `POWERBOLAGET_SECRET`. To stop or restart the service:
 
 ```sh
 docker compose down
@@ -46,7 +46,7 @@ docker compose up -d --build
 
 The application, API messages and development documentation use English. The default four-turbine 5 MW plan, seed 42, January 1 start and default resources produce a 133-day schedule. The reference Baltic One plan adds a ring cable, a 110 m hub and 2 MW / 8 MWh storage and produces a 138-day schedule. Changes to quantities, resources or start date recalculate these results.
 
-Actions autosave. Checkpoints and JSON command replays are supported. A scenario lasts 365 days; projects cannot be approved if they finish after that horizon. Save identifiers and the replay format remain compatible with earlier versions. Old replays use the current weather and scheduling model, so historical numerical results can differ.
+Every action is saved in the browser (IndexedDB), together with the last seven days of chart history. The saves menu exports a save file, holding the replayable command list, the signed state and the chart history, and loads one back; files exported by earlier versions contain only commands and are replayed. Checkpoints stay in the browser. A scenario lasts 365 days; projects cannot be approved if they finish after that horizon. The replay format remains compatible with earlier versions. Old replays use the current weather and scheduling model, so historical numerical results can differ.
 
 ## Day and night
 

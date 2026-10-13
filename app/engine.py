@@ -282,7 +282,7 @@ def apply(game,command):
 
 def public(g):
     out=deepcopy(g)
-    if out.get('version')!=VERSION:evaluate(out)
+    if out.get('version')!=VERSION or 'snapshot' not in out:evaluate(out)
     out['catalog']=catalog(g);out['weather_options']=WEATHER;out['limitations']=LIMITATIONS
     out['timestamp']=(datetime(2030,1,1)+timedelta(minutes=15*g['step'])).strftime('%Y-%m-%d %H:%M')
     out['installed_mw']=(40 if 'wind_phase2' in g['upgrades'] else 20)+sum(n['rated_mw'] for p in g.get('plants',[]) for n in p['plan']['nodes'] if n['kind']=='turbine')
