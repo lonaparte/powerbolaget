@@ -15,7 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel,ConfigDict,Field
 from .compute import Compute
 from .errors import RuleError
-from .parameters import VERSION
+from .parameters import LIMITATIONS, VERSION, WEATHER
+from .climate import reference as climate_reference
 
 # Saves live in the player's browser. The server keeps nothing between requests: each request carries the
 # core state this server signed last time, and each reply carries the next signed state.
@@ -106,6 +107,11 @@ async def runtime_error(request,exc):
 
 @app.get('/api/health')
 def health(): return dict(status='ok',version=VERSION,solver='OpenDSSDirect.py 0.9.4',step_minutes=15)
+
+@app.get('/api/reference')
+def reference():
+    """Fixed data the browser loads once per visit: model limitations, weather tests and the outlook constants."""
+    return dict(version=VERSION,limitations=LIMITATIONS,weather_options=WEATHER,climate=climate_reference())
 
 @app.post('/api/new')
 def new(payload:NewScenario):

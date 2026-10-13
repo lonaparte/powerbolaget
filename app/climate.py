@@ -8,6 +8,7 @@ import json
 import random
 from pathlib import Path
 from math import sin, cos, tan, acos, pi, sqrt, exp, floor, log
+from datetime import datetime, timedelta
 from functools import lru_cache
 
 DATA=json.loads(Path(__file__).with_name('baltic-coastal-climatology.json').read_text(encoding='utf-8-sig'))
@@ -93,3 +94,19 @@ def conditions(seed,step,mode='normal'):
                 location='A Baltic coastal city',latitude=LAT,longitude=LON,time_basis='CET / UTC+1',
                 source='Baltic coastal seasonal function + smooth random disturbances; NASA POWER 2001–2020 calibration',
                 baseline_period='2001–2020',test_override=mode!='normal')
+
+
+def reference():
+    """Constants the browser needs to evaluate the outlook itself (web/climate.js)."""
+    return dict(latitude=LAT,longitude=LON,coefficients={k:[mean,[list(t) for t in terms]] for k,(mean,terms) in COEFFICIENTS.items()})
+
+
+def outlook(seed,step):
+    """Seven-day outlook in normal climate. The browser computes the same values; this is the reference."""
+    days=[]
+    for day in range(step//96,step//96+7):
+        hours=[conditions(seed,day*96+h*4) for h in range(24)]
+        days.append(dict(date=(datetime(2030,1,1)+timedelta(days=day)).strftime('%m-%d'),
+            wind_ms=sum(w['wind_10m_ms'] for w in hours)/24,temperature_c=sum(w['temperature_c'] for w in hours)/24,
+            solar_kwh_m2=hours[0]['daily_solar_kwh_m2'],daylight_hours=hours[0]['daylight_hours']))
+    return days
