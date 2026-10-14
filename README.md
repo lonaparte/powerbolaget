@@ -30,6 +30,8 @@ To change the host port, create a `.env` file beside `compose.yaml` containing `
 
 To update the application:
 
+Before upgrading a version that stores saves in server-side SQLite, export each scenario through that version's saves menu. The browser-save version does not automatically migrate `coastal.sqlite3`; load the exported files through **Saves / scenarios** after the upgrade.
+
 ```sh
 git pull --ff-only
 docker compose up -d --build
@@ -85,7 +87,19 @@ For frontend development, JavaScript syntax checks can be run from a Linux shell
 node --check web/app.js
 node --check web/planner.js
 node --check web/pixel.js
+node --check web/climate.js
+node --check web/saves.js
 ```
+
+Browser save regression tests use Playwright and Chromium against a disposable local Python server:
+
+```sh
+npm install --no-save --package-lock=false playwright
+npx playwright install chromium
+POWERBOLAGET_TEST_PYTHON=.venv/bin/python node --test tests/browser_saves.cjs
+```
+
+The browser suite checks in-flight scenario changes, atomic cross-tab saves, failed writes, legacy-file import, signing-key recovery and the memory-only storage fallback. `POWERBOLAGET_TEST_CHROMIUM` can select an existing Chromium executable.
 
 The model/API suite covers planning, scheduling, continuous climate, commissioning, protection, save handling and the solver boundary. `tests/endurance.py` validates all 35,040 intervals of a simulated year. See [Validation records](docs/VALIDATION.md), raw evidence in `results/`.
 
