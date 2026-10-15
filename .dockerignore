@@ -1,6 +1,9 @@
 **
 !Dockerfile
 !requirements.lock
+!pyproject.toml
+!tools/
+!tools/deps.py
 !app/
 !app/**
 !web/

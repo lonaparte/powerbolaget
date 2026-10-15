@@ -1,0 +1,9 @@
+# Direct external dependencies, grouped by role (PEP 735 dependency groups).
+# Exact versions of the whole dependency closure are pinned in requirements.lock.
+#   python tools/deps.py install   install the pinned set and verify the electrical backends
+#   python tools/deps.py lock      re-pin requirements.lock after changing a group
+[dependency-groups]
+web = ["fastapi", "uvicorn"]
+# Electrical calculation libraries. Each one is imported only by its backend in app/solvers/.
+solvers = ["opendssdirect.py"]
+test = ["httpx", "pytest"]

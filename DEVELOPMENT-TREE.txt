@@ -6,6 +6,10 @@ Screenshots show the current English interface.
 
 Powerbolaget-0.0.1/
 ├── app/
+│   ├── solvers/
+│   │   ├── __init__.py
+│   │   ├── model.py
+│   │   └── opendss.py
 │   ├── __init__.py
 │   ├── baltic-coastal-climatology.json
 │   ├── climate.py
@@ -117,20 +121,28 @@ Powerbolaget-0.0.1/
 │   ├── pytest.txt
 │   └── rename-validation.json
 ├── tests/
+│   ├── browser_saves.cjs
 │   ├── endurance.py
 │   ├── test_api.py
+│   ├── test_browser_climate.py
 │   ├── test_model.py
-│   └── test_planning_climate.py
+│   ├── test_planning_climate.py
+│   └── test_solvers.py
 ├── tools/
+│   ├── deps.py
 │   ├── development_tree.py
 │   ├── license_inventory.py
-│   ├── lock_runtime.py
-│   └── package.py
+│   ├── package.py
+│   └── pixel_font.py
 ├── web/
 │   ├── app.js
+│   ├── climate.js
 │   ├── index.html
+│   ├── pixel-font.woff
+│   ├── pixel.js
 │   ├── planner.css
 │   ├── planner.js
+│   ├── saves.js
 │   └── style.css
 ├── .dockerignore
 ├── compose.yaml
@@ -138,6 +150,7 @@ Powerbolaget-0.0.1/
 ├── Dockerfile
 ├── LICENSE
 ├── LICENSE-REVIEW.txt
+├── pyproject.toml
 ├── pytest.ini
 ├── README.md
 ├── requirements.lock

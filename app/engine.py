@@ -2,7 +2,7 @@
 from copy import deepcopy
 from math import sin, cos, pi
 from datetime import datetime, timedelta
-from .parameters import DT_H, DISTRICTS, PROJECTS, TURBINES, WEATHER, LIMITATIONS, VERSION
+from .parameters import DT_H, DISTRICTS, PROJECTS, TURBINES, WEATHER, VERSION
 from .wind import weather, farm
 from .network import Network
 from .protection import inject, repair, event
@@ -282,18 +282,11 @@ def apply(game,command):
 
 def public(g):
     out=deepcopy(g)
-    if out.get('version')!=VERSION:evaluate(out)
-    out['catalog']=catalog(g);out['weather_options']=WEATHER;out['limitations']=LIMITATIONS
+    if out.get('version')!=VERSION or 'snapshot' not in out:evaluate(out)
+    out['catalog']=catalog(g)
     out['timestamp']=(datetime(2030,1,1)+timedelta(minutes=15*g['step'])).strftime('%Y-%m-%d %H:%M')
     out['installed_mw']=(40 if 'wind_phase2' in g['upgrades'] else 20)+sum(n['rated_mw'] for p in g.get('plants',[]) for n in p['plan']['nodes'] if n['kind']=='turbine')
     out['plants']=g.get('plants',[]);out['draft']=g.get('draft',default_plan());out['version']=VERSION
-    from .climate import conditions
-    out['climate_days']=[]
-    for day in range(g['step']//96,g['step']//96+7):
-        hours=[conditions(g['seed'],day*96+h*4) for h in range(24)]
-        out['climate_days'].append(dict(date=(datetime(2030,1,1)+timedelta(days=day)).strftime('%m-%d'),
-            wind_ms=sum(w['wind_10m_ms'] for w in hours)/24,temperature_c=sum(w['temperature_c'] for w in hours)/24,
-            solar_kwh_m2=hours[0]['daily_solar_kwh_m2'],daylight_hours=hours[0]['daylight_hours']))
     return out
 
 
