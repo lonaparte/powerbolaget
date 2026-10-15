@@ -13,7 +13,7 @@ before(async () => {
   data = fs.mkdtempSync(path.join(os.tmpdir(), 'powerbolaget-browser-saves-'));
   server = spawn(process.env.POWERBOLAGET_TEST_PYTHON || 'python',
     ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '0'],
-    {cwd:root, env:{...process.env, COASTAL_DATA:data}, stdio:['ignore', 'ignore', 'pipe']});
+    {cwd:root, env:{...process.env, COASTAL_DATA:data, PYTHONDONTWRITEBYTECODE:'1'}, stdio:['ignore', 'ignore', 'pipe']});
   await new Promise((resolve, reject) => {
     let log = '';
     const timeout = setTimeout(() => reject(Error('Test server startup timed out: '+log)), 20000);
@@ -169,6 +169,30 @@ test('file import acquires the write lock before reading the file', {timeout:200
   await page.evaluate(() => window.releaseFile());
   await page.waitForFunction(() => !busy && game.seed === 7 && game.step === 4);
   await consistent(page);
+});
+
+test('a file that is not a save only warns and keeps the saved scenario and status', {timeout:20000}, async t => {
+  const {page} = await scenario(t), before = await current(page);
+  for(const buffer of [Buffer.from('not json'), Buffer.from(JSON.stringify({format:'other', commands:[]}))]) {
+    await page.locator('[data-modal="saves"]').click();
+    await page.locator('#importFile').setInputFiles({name:'notes.json', mimeType:'application/json', buffer});
+    await page.waitForFunction(() => !busy && document.getElementById('toast').className.includes('error'));
+    assert.match(await page.locator('#toast').textContent(), /not a Powerbolaget save file/);
+    assert.equal(await page.locator('#connection').textContent(), 'Saved in this browser');
+    assert.deepEqual(await current(page), before);
+    await page.evaluate(() => {if(document.getElementById('dialog').open) closeModal();document.getElementById('toast').className='';});
+  }
+});
+
+test('opening the scenario in another tab keeps the first tab writable', {timeout:20000}, async t => {
+  const {context, page:first} = await scenario(t);
+  const rev = (await current(first)).save.rev;
+  const second = await openPage(context);
+  assert.equal((await current(second)).save.rev, rev, 'loading an unchanged save must not write it');
+  assert.equal(await first.evaluate(() => command({kind:'advance', steps:4})), true);
+  assert.equal(await second.evaluate(() => command({kind:'advance', steps:4})), false);
+  assert.match(await second.locator('#toast').textContent(), /another tab/);
+  await consistent(first);
 });
 
 test('an aborted IndexedDB transaction leaves the previous state and replay intact', {timeout:20000}, async t => {

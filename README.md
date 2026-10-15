@@ -28,9 +28,9 @@ docker compose up -d
 
 To change the host port, create a `.env` file beside `compose.yaml` containing `POWERBOLAGET_PORT=8083`, then run `docker compose up -d`. The container continues listening on port 8082; open http://127.0.0.1:8083 on the host.
 
-To update the application:
-
 Before upgrading a version that stores saves in server-side SQLite, export each scenario through that version's saves menu. The browser-save version does not automatically migrate `coastal.sqlite3`; load the exported files through **Saves / scenarios** after the upgrade.
+
+To update the application:
 
 ```sh
 git pull --ff-only
@@ -99,7 +99,7 @@ npx playwright install chromium
 POWERBOLAGET_TEST_PYTHON=.venv/bin/python node --test tests/browser_saves.cjs
 ```
 
-The browser suite checks in-flight scenario changes, atomic cross-tab saves, failed writes, legacy-file import, signing-key recovery and the memory-only storage fallback. `POWERBOLAGET_TEST_CHROMIUM` can select an existing Chromium executable.
+The browser suite checks in-flight scenario changes, atomic cross-tab saves, failed writes, legacy-file import, invalid files, a second open tab, signing-key recovery and the memory-only storage fallback. `POWERBOLAGET_TEST_CHROMIUM` can select an existing Chromium executable.
 
 The model/API suite covers planning, scheduling, continuous climate, commissioning, protection, save handling and the solver boundary. `tests/endurance.py` validates all 35,040 intervals of a simulated year. See [Validation records](docs/VALIDATION.md), raw evidence in `results/`.
 
