@@ -79,9 +79,11 @@ Messages: firm and society plans (spec: ActivityPlan) become device targets and 
 - **Tourism.** Arrivals depend on season, weekday, forecast weather and lodging price, limited by free beds and ferry seats. Stays average 3.6 days. Holiday-home occupancy follows season and weekends. Visitors are funded from the mainland and their unspent money returns there.
 - **Monthly.**
   - Births and deaths by group.
-  - Ageing: school leavers join the labour force in the sector with most vacancies nearby; workers retire.
-  - Migration: movers are drawn from the unemployed, from a small share of the employed, and from residents pushed by outages. They then choose by logit among zones with free housing and the mainland. Utility covers nearby vacancies, amenity, housing tightness and outage hours.
-  - Immigration responds to vacancies and unemployment.
+  - Ageing: 40 % of school leavers go to the mainland to study or work; the rest join the labour force in the sector with most vacancies nearby. Workers retire.
+  - Moving away: 3.5 % of working-age residents and 0.8 % of retirees leave for the mainland each year for life reasons. On top of that, 12 % of the unemployed leave each year, and outages push more people out.
+  - Moving within the island: movers choose by logit among zones with free housing. Utility covers nearby vacancies, amenity, housing tightness and outage hours.
+  - Immigration responds to vacancies and falls when unemployment is above 5 %.
+  - For scale: Region Gotland's forecast for 2025–2035 expects about 2,540 people moving in and 2,400 moving out each year, on about 60,850 residents.
   - The monthly account `end = start + births - deaths + in - out` is exact (`world.demography`).
 - **Simplified:** no age-specific fertility, no household formation model, and no explicit commuting matrix. Jobs are matched within 40 km.
 
@@ -138,6 +140,7 @@ Messages: firm and society plans (spec: ActivityPlan) become device targets and 
   - rates per 100 km for lines and per unit otherwise;
   - overhead lines are scaled by storm, lightning and icing; turbines by age and time since maintenance;
   - 75 % of 110 kV overhead-line faults are transient and auto-reclose after one second. Permanent faults wait for repair (log-uniform repair times by component);
+  - after a permanent fault on a 20 kV land feeder, the distribution operator isolates the faulted section and re-feeds the rest by switching: in 15–45 minutes with two circuits (0–8 % of customers left waiting for the repair), or in 45–150 minutes with one (15–35 % left). The sea cable to the islet has no other path;
   - a fault study records the three-phase fault current;
   - thermal overload protection uses inverse time, and the operator recloses after 30 minutes;
   - turbines disconnect outside 0.85–1.12 pu and restart eight minutes after their bus is live again.

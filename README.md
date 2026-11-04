@@ -64,7 +64,7 @@ The design is documented in `docs/MODEL.md`, mapped section by section to the v0
   - Jensen wakes inside each wind farm.
   - An automatic operator balances the island with the mainland links, then batteries, then wind curtailment, and last load shedding by priority class.
   - On-load tap changers regulate the 20 kV and 110 kV busbars.
-  - Faults depend on weather, age and maintenance. Protection trips, overhead lines reclose, and repairs take time. Grid-forming batteries can carry the island when the mainland is lost.
+  - Faults depend on weather, age and maintenance. Protection trips, overhead lines reclose, faulted 20 kV feeders are re-fed by switching, and repairs take time. Grid-forming batteries can carry the island when the mainland is lost.
   - A power flow that does not converge is reported as a numerical failure, never as a blackout.
 - **Mainland links.**
   - The existing HVDC: two links of 130 MW.
@@ -111,7 +111,7 @@ The Python suite covers:
 - loads that do not step at hour boundaries;
 - power balance and energy bookkeeping every minute;
 - outages that trip equipment at once, with warm-up after restoration;
-- fault, protection and repair;
+- fault, protection and repair, with faulted 20 kV feeders re-fed by switching;
 - islanding on a grid-forming battery, and blackout without one;
 - the HVAC link taking over from and failing over to the HVDC;
 - determinism, and save/load continuation within tolerance;
