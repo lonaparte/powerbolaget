@@ -73,10 +73,11 @@ def build_grid(world):
         G.add_bus(grid, z['id'], z['name'], 20., z['x'], z['y'], 'zone', zone=z['id'])
     for zid, (src, ltype, n) in FEEDERS.items():
         start = src if src.startswith('z') else f'{src.lower()}_20'
-        G.add_line(grid, f'f_{zid}', start, zid, ltype, circuits=n,
+        # Land feeders can be re-fed by switching after a fault; the sea cable to the islet cannot.
+        G.add_line(grid, f'f_{zid}', start, zid, ltype, circuits=n, restorable=not src.startswith('z'),
                    name=f"Feeder {grid['buses'][start]['name']} → {world.zone_by_id[zid]['name']}")
     G.add_bus(grid, 'ind_kal', 'Kalkudden industry 20 kV', 20., 46.4, 88.7, 'industry', zone='z04')
-    G.add_line(grid, 'f_ind_kal', 'kal_20', 'ind_kal', 'CAB20', circuits=3, name='Feeder Kalkudden → cement works')
+    G.add_line(grid, 'f_ind_kal', 'kal_20', 'ind_kal', 'CAB20', circuits=3, restorable=True, name='Feeder Kalkudden → cement works')
     for fid, name, host, (fx, fy), model, rows, age in WIND_FARMS:
         key = fid.lower()
         mw = len([p for r in rows for p in r])*{'PB-2.3': 2.3, 'PB-3.6': 3.6}[model]

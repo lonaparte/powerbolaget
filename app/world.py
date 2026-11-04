@@ -483,7 +483,7 @@ class World:
         target = ev['target']
         if target == 'branch':
             br = self.grid['branches'].get(ev['id'])
-            if not br or not G.in_service(br):
+            if not br or not G.in_service(br) or br['repair_until'] is not None:
                 return
             current = self.fault_current(br)
             permanent = not (br['kind'] == 'line' and br['type'].startswith('OHL')
@@ -496,6 +496,9 @@ class World:
                 kind = br['type'] if br['kind'] == 'line' else 'transformer'
                 br['repair_until'] = t+N.repair_minutes(self, kind)
                 self.events.push(br['repair_until'], 'restore', 'restore', id=br['id'], reason='repair completed')
+                plan = N.sectionalise(self, br)
+                if plan and plan[0] < br['repair_until']-t:
+                    self.events.push(t+plan[0], 'restore', 'restore', id=br['id'], reason='sectionalised', share=round(plan[1], 3))
         elif target == 'turbine':
             tb = self.grid['turbines'].get(ev['id'])
             if not tb or tb['status'] != 'ok':
@@ -572,9 +575,27 @@ class World:
             br = self.grid['branches'].get(ev['id'])
             if not br:
                 return
+            name = br.get('name', br['id'])
             if ev['reason'] == 'repair completed':
                 br['repair_until'] = None
-            if br['repair_until'] is not None or not br['tripped']:
+                if br.get('section_out') is not None:
+                    br['section_out'] = None
+                    if not br['tripped']:
+                        br['fault'] = None
+                        self.log('restore', f"{name}: faulted section repaired; every customer is back", None, branch=br['id'])
+                        return
+            elif ev['reason'] == 'sectionalised':
+                if not br['tripped'] or not br['closed'] or br['repair_until'] is None:
+                    return
+                br['section_out'], br['tripped'] = ev['share'], False
+                self.network.switch(br['id'])
+                zone = self.grid['buses'][br['b']].get('zone')
+                who = self.zone_by_id[zone]['name'] if zone in self.zone_by_id else self.grid['buses'][br['b']]['name']
+                left = (f"{ev['share']:.0%} of customers in {who} wait for the repair (until {label(br['repair_until'])})"
+                        if ev['share'] >= .005 else f"every customer in {who} is back; repair continues until {label(br['repair_until'])}")
+                self.log('restore', f"{name}: faulted section isolated and supply switched over; {left}", zone, branch=br['id'])
+                return
+            if (br['repair_until'] is not None and br.get('section_out') is None) or not br['tripped']:
                 return
             br['tripped'] = False
             br['fault'] = None

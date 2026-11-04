@@ -104,6 +104,31 @@ def test_fault_protection_and_repair_restore_supply():
     assert any(e['kind'] == 'protection' for e in w.logbook)
 
 
+def test_a_feeder_fault_is_sectionalised_before_the_repair():
+    w = World(seed=4)
+    w.advance(5)
+    # Cable faults are permanent. The single-circuit feeder trips, then switching re-feeds most customers.
+    w.events.push(w.minute+.25, 'fault', 'protection', target='branch', id='f_z06', cause='test')
+    w.advance(1)
+    br = w.grid['branches']['f_z06']
+    assert br['tripped'] and w.devices['res_z06']['served'] == 0
+    w.advance(151)
+    assert not br['tripped'] and br['repair_until'] is not None and 'z06' in w.network.energized
+    share = br['section_out']
+    assert .15 <= share <= .35
+    assert w.devices['res_z06']['served'] == pytest.approx(1-share)
+    w.events.cancel(lambda e: e.get('id') == 'f_z06' and e.get('reason') == 'repair completed')
+    br['repair_until'] = w.minute+5
+    w.events.push(br['repair_until'], 'restore', 'restore', id='f_z06', reason='repair completed')
+    w.advance(7)
+    assert br['section_out'] is None and br['repair_until'] is None and w.devices['res_z06']['served'] == 1
+    # The sea cable to the islet has no other path: its customers wait for the repair.
+    w.events.push(w.minute+.25, 'fault', 'protection', target='branch', id='f_z14', cause='test')
+    w.advance(200)
+    assert w.grid['branches']['f_z14']['tripped'] and w.devices['res_z14']['served'] == 0
+    assert w.perf['failures'] == 0
+
+
 def test_grid_forming_battery_carries_the_island_when_the_link_is_lost():
     w = World(seed=5)
     w.advance(5)

@@ -54,7 +54,8 @@ PB.inspector = (() => {
         ['Rating', PB.fmt(d.rating_mva, 1) + ' MVA' + (d.amps ? ` · ${PB.int(d.amps)} A` : '')], d.tap ? ['Tap (low-voltage side)', PB.fmt(d.tap, 4)] : null,
         ['P / Q at start', `${PB.fmt(f[0], 2)} MW / ${PB.fmt(f[1], 2)} Mvar`], ['P / Q at end', `${PB.fmt(f[2], 2)} MW / ${PB.fmt(f[3], 2)} Mvar`],
         ['Losses', PB.fmt((f[0] + f[2]) * 1000, 0) + ' kW'], ['Current', PB.int(f[4]) + ' A'], ['Loading', PB.pct(d.loading, 1)],
-        d.fault ? ['Last protection action', PB.esc(d.fault)] : null, d.repair_until ? ['Repair crew done', PB.esc(d.repair_until)] : null])
+        d.fault ? ['Last protection action', PB.esc(d.fault)] : null, d.repair_until ? ['Repair crew done', PB.esc(d.repair_until)] : null,
+        d.section_out != null ? ['Faulted section isolated', PB.pct(d.section_out, 0) + ' of customers off until repair'] : null])
         + bar(d.loading) + `<h3>LOADING, LAST ${d.history.length} H</h3><canvas class="mini" data-hist="load"></canvas>`
         + `<div class="actions">${d.actions.includes('switch') ? `<button class="button ${d.status === 'open' ? 'primary' : 'danger'}" data-cmd="switch">${d.status === 'open' ? 'Close breaker' : 'Open breaker'}</button>` : ''}${pin(d.id)}</div>`;
     } else if (d.type === 'bus') {

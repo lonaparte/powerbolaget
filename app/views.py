@@ -159,6 +159,7 @@ def entity(world, eid):
                     flow=[r(x) for x in flow] if flow else None, loading=r(f.get('loading', {}).get(eid, 0.), 3),
                     status=branch_state(world, eid, br, f)[3], fault=br.get('fault'),
                     repair_until=label(br['repair_until']) if br['repair_until'] is not None else None,
+                    section_out=br.get('section_out'),
                     history=list(hist.get(eid, [])), unit='loading (1 = rating)', actions=['switch'] if eid != 'hvdc' else [])
     if eid in grid['buses']:
         b = grid['buses'][eid]

@@ -57,7 +57,9 @@ def add_transformer(grid, bid, hv, lv, ttype, mva, **extra):
 
 
 def in_service(branch):
-    return branch['closed'] and not branch['tripped'] and branch['repair_until'] is None and not branch.get('planned')
+    """Closed, not tripped and not waiting for repair. A sectionalised feeder runs while its faulted section is repaired."""
+    return (branch['closed'] and not branch['tripped'] and not branch.get('planned')
+            and (branch['repair_until'] is None or branch.get('section_out') is not None))
 
 
 def hvac_active(grid):
