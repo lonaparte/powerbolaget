@@ -76,12 +76,12 @@ def test_energy_bookkeeping_matches_the_minutes(day_world):
 def test_outage_trips_equipment_at_once_and_restart_waits():
     w = World(seed=2)
     w.advance(10)
-    command(w, dict(kind='switch', target='f_ind_kal', closed=False))
+    command(w, dict(kind='switch', target='l_kal_ind', closed=False))
     w.advance(1)
     kiln = w.devices['f_cement_kiln']
     assert kiln['state'] == 'tripped' and kiln['served'] == 0
     assert 'ind_kal' not in w.network.energized
-    command(w, dict(kind='switch', target='f_ind_kal', closed=True))
+    command(w, dict(kind='switch', target='l_kal_ind', closed=True))
     w.advance(45)
     assert kiln['state'] == 'warmup'          # a tripped kiln needs hours before it produces again
     assert w.devices['res_z11']['served'] == 1.0

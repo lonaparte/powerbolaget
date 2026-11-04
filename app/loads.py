@@ -12,6 +12,7 @@ Requests are what devices ask for. What they receive comes back from the energy 
 """
 from math import exp, pi, sin, tan, acos
 from .calendar import HOUR, is_rest_day, parts
+from .params import DEMAND_SCALE
 
 PRIORITY = {'flexible': 1, 'commercial': 2, 'residential': 3, 'industry': 4, 'critical': 5}
 UA_HOUSEHOLD = .125        # kW/K per household (assumption)
@@ -100,21 +101,20 @@ def request(d, t, w, ctx):
     s = lerp_scale(d, t)
     temp = w['temperature_c']
     if kind == 'residential':
-        appliances = s*residential_shape(h, ctx['rest'])
-        heat = d['heat_electric_kw']
-        return (appliances+heat)/1000
-    if kind == 'services':
+        kw = s*residential_shape(h, ctx['rest'])+d['heat_electric_kw']
+    elif kind == 'services':
         dark = 1-min(1., w['irradiance_w_m2']/250)
-        return s*(.28+(.95+.18*dark)*open_hours(h, t)+.05*max(0., 17-temp)*.45)/1000
-    if kind == 'public':
-        return (s*(.26+.78*office_hours(h, t)+.045*max(0., 17-temp)*.35)+d.get('base_kw', 0.))/1000
-    if kind == 'lodging':
-        beds = d['beds']
-        return (beds*(.045+.035*max(0., 16-temp)*.5)+s*(.28+.34*bump(h, 8, 1.5)+.38*bump(h, 20, 2.2)))/1000
-    if kind == 'farm':
+        kw = s*(.28+(.95+.18*dark)*open_hours(h, t)+.05*max(0., 17-temp)*.45)
+    elif kind == 'public':
+        kw = s*(.26+.78*office_hours(h, t)+.045*max(0., 17-temp)*.35)+d.get('base_kw', 0.)
+    elif kind == 'lodging':
+        kw = d['beds']*(.045+.035*max(0., 16-temp)*.5)+s*(.28+.34*bump(h, 8, 1.5)+.38*bump(h, 20, 2.2))
+    elif kind == 'farm':
         milking = .6+.9*bump(h, 6, 1.0)+.9*bump(h, 17, 1.0)
-        return (s*.085*milking+d.get('base_kw', 0.)+.02*s*max(0., 5-temp))/1000
-    raise ValueError(kind)
+        kw = s*.085*milking+d.get('base_kw', 0.)+.02*s*max(0., 5-temp)
+    else:
+        raise ValueError(kind)
+    return kw*DEMAND_SCALE/1000
 
 
 def equipment_power(d, t, ctx):

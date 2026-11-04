@@ -93,6 +93,11 @@ WIND_FARMS = [
     ('WF1', 'Uddens vindpark', 'SUD', (10.4, 21.2), 'PB-2.3', [_rows(6.9, 21.3, .5, .55, 5, 1, 0, 0), _rows(7.7, 20.3, .5, .55, 5, 1, 0, 0)], 14),
     ('WF2', 'Östergarns vindpark', 'LJU', (49.6, 59.2), 'PB-3.6', [_rows(51.2, 56.6, .1, .82, 4, 1, 0, 0), _rows(52.6, 56.7, .1, .82, 4, 1, 0, 0)], 6),
     ('WF3', 'Nordheds vindpark', 'NOR', (37.4, 105.4), 'PB-2.3', [_rows(35.6, 107.1, 1.05, .1, 4, 1, 0, 0), _rows(35.8, 108.1, 1.05, .1, 4, 1, 0, 0)], 11),
+    # Like Gotland, most capacity stands on the windy south-western headland (Näsudden), with more in the
+    # north-east and south-east: about 160 MW in all (Gotland: about 180 MW producing about 450 GWh a year).
+    ('WF4', 'Näsuddens vindpark II', 'SUD', (9.6, 23.0), 'PB-3.6', [_rows(6.6, 22.4, .5, .05, 5, 1, 0, 0), _rows(7.0, 23.4, .5, .05, 5, 1, 0, 0)], 9),
+    ('WF5', 'Ruteparken', 'NOR', (50.2, 98.2), 'PB-2.3', [_rows(48.0, 99.5, .65, .1, 5, 1, 0, 0), _rows(50.5, 98.5, .65, .1, 5, 1, 0, 0)], 12),
+    ('WF6', 'Havdhems vindpark', 'HEM', (20.4, 29.8), 'PB-3.6', [_rows(18.4, 29.0, .65, .1, 4, 1, 0, 0), _rows(19.2, 31.0, .65, .1, 4, 1, 0, 0)], 4),
 ]
 
 TURBINE_MODELS = {

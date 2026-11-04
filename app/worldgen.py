@@ -5,7 +5,7 @@ from . import grid as G
 from . import loads as L
 from .construction import add_turbine
 from .calendar import DAY, YEAR
-from .island import FEEDERS, HVAC, LINES_110, LINK_POLE_MW, LINK_POLES, LINK_STATION, MAINLAND, SUBSTATIONS, WIND_FARMS, ZONES
+from .island import FEEDERS, HVAC, LINES_110, LINK_POLE_MW, LINK_POLES, LINK_STATION, MAINLAND, SUBSTATIONS, TURBINE_MODELS, WIND_FARMS, ZONES
 from .params import HOUSEHOLD_SIZE, SECTORS, STARTING_CASH
 from .rng import stable_unit
 from .society import pop, refresh_stats
@@ -76,11 +76,15 @@ def build_grid(world):
         # Land feeders can be re-fed by switching after a fault; the sea cable to the islet cannot.
         G.add_line(grid, f'f_{zid}', start, zid, ltype, circuits=n, restorable=not src.startswith('z'),
                    name=f"Feeder {grid['buses'][start]['name']} → {world.zone_by_id[zid]['name']}")
-    G.add_bus(grid, 'ind_kal', 'Kalkudden industry 20 kV', 20., 46.4, 88.7, 'industry', zone='z04')
-    G.add_line(grid, 'f_ind_kal', 'kal_20', 'ind_kal', 'CAB20', circuits=3, restorable=True, name='Feeder Kalkudden → cement works')
+    # The cement works (about 40 MW) has its own 110/20 kV station, fed from Kalkudden over 110 kV.
+    G.add_bus(grid, 'ind_kal_110', 'Kalkudden cement works 110 kV', 110., 46.4, 88.7, 'industry', zone='z11')
+    G.add_bus(grid, 'ind_kal', 'Kalkudden cement works 20 kV', 20., 46.4, 88.7, 'industry', zone='z11')
+    G.add_line(grid, 'l_kal_ind', 'kal_110', 'ind_kal_110', 'OHL110', name='Kalkudden–cement works')
+    for i in (1, 2):
+        G.add_transformer(grid, f't_ind_kal_{i}', 'ind_kal_110', 'ind_kal', '110/20', 40., name=f'Cement works T{i}')
     for fid, name, host, (fx, fy), model, rows, age in WIND_FARMS:
         key = fid.lower()
-        mw = len([p for r in rows for p in r])*{'PB-2.3': 2.3, 'PB-3.6': 3.6}[model]
+        mw = len([p for r in rows for p in r])*TURBINE_MODELS[model]['mw']
         hv = G.add_bus(grid, f'{key}_110', f'{name} 110 kV', 110., fx, fy, 'farm')
         hub = G.add_bus(grid, f'{key}_33', f'{name} 33 kV', 33., fx, fy, 'collector')
         G.add_transformer(grid, f'{key}_tr', hv, hub, '110/33', float(ceil(mw*1.2/10)*10), name=f'{name} 110/33 kV')

@@ -60,6 +60,12 @@ STAY_DAYS = 3.6
 HOLIDAY_PERSONS = 2.8
 TOURIST_BUDGET_DAY = 900.        # SEK per visitor and day besides lodging (meals, shops, activities)
 
+# Calibration of homes, services, public buildings, lodging and farms to Gotland's electricity use: Region
+# Gotland reports 850-1,000 GWh a year, about 350 GWh of it the cement works, so about 9.4 MWh per resident
+# for everything else. The load shapes above give 75 % of that; this factor scales them up (assumption: the
+# missing use is spread like the modelled use).
+DEMAND_SCALE = 1.25
+
 # Demography (per year).
 BIRTH_RATE = .0092
 DEATH_RATE = .0108

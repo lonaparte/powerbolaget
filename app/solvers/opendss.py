@@ -1,5 +1,5 @@
 """OpenDSS backend (OpenDSSDirect.py): the only module that imports the OpenDSS library."""
-import math
+import numpy as np
 from opendssdirect import dss
 from .model import GridFormer, GridModel, Line, Load, Generator, Results, SolverError, Transformer
 
@@ -71,28 +71,49 @@ class Backend:
         for name, (kw, kvar) in generators.items():
             d.Generators.Name(name); d.Generators.kW(kw); d.Generators.kvar(kvar)
 
-    def results(self):
+    def _layout(self):
+        """Where each bus voltage and each branch terminal sits in OpenDSS's flat result arrays. Switching
+        opens terminals but never changes the layout, and a new circuit gets a new Backend, so this is
+        computed once per instance (rebuilt if the element counts ever differ)."""
         d = self.d
-        nodes, mags, volts = d.Circuit.AllNodeNames(), d.Circuit.AllBusMagPu(), d.Circuit.AllBusVolts()
-        vm, va = {}, {}
-        for i, node in enumerate(nodes):
-            bus, _, phase = node.partition('.')
-            if phase == '1':
-                re, im = volts[2*i], volts[2*i+1]
-                vm[bus] = mags[i]
-                va[bus] = math.degrees(math.atan2(im, re))
-        names, powers, currents = d.PDElements.AllNames(), d.PDElements.AllPowers(), d.PDElements.AllMaxCurrents()
+        nodes, names = d.Circuit.AllNodeNames(), d.PDElements.AllNames()
+        key = (len(nodes), len(names))
+        cached = getattr(self, '_cache', None)
+        if cached and cached[0] == key:
+            return cached[1]
+        first = [i for i, n in enumerate(nodes) if n.partition('.')[2] == '1']
         terminals, conductors = d.PDElements.AllNumTerminals(), d.PDElements.AllNumConductors()
-        branches, k = {}, 0
-        for name, nt, nc, imax in zip(names, terminals, conductors, currents):
-            sums = []
-            for _ in range(nt):
-                sums.append((sum(powers[k+2*j] for j in range(nc))/1000, sum(powers[k+2*j+1] for j in range(nc))/1000))
-                k += 2*nc
+        width = max(conductors) if len(conductors) else 1
+        size = 2*sum(nt*nc for nt, nc in zip(terminals, conductors))
+        rows1, rows2, branch_names, elements, k = [], [], [], [], 0
+        for e, (name, nt, nc) in enumerate(zip(names, terminals, conductors)):
             kind, _, short = name.partition('.')
             if kind.lower() in ('line', 'transformer'):
-                (p1, q1), (p2, q2) = sums[0], sums[-1]
-                branches[short.lower()] = (p1, q1, p2, q2, imax)
+                last = k+2*nc*(nt-1)
+                rows1.append([k+2*j for j in range(nc)]+[size]*(width-nc))      # padding points at a zero
+                rows2.append([last+2*j for j in range(nc)]+[size]*(width-nc))
+                branch_names.append(short.lower())
+                elements.append(e)
+            k += 2*nc*nt
+        layout = dict(buses=[nodes[i].partition('.')[0] for i in first], first=np.array(first, dtype=np.intp),
+                      rows1=np.array(rows1, dtype=np.intp).reshape(-1, width), rows2=np.array(rows2, dtype=np.intp).reshape(-1, width),
+                      names=branch_names, elements=np.array(elements, dtype=np.intp))
+        self._cache = (key, layout)
+        return layout
+
+    def results(self):
+        d = self.d
+        lay = self._layout()
+        mags, volts = np.asarray(d.Circuit.AllBusMagPu()), np.asarray(d.Circuit.AllBusVolts())
+        first = lay['first']
+        vm = dict(zip(lay['buses'], mags[first].tolist()))
+        va = dict(zip(lay['buses'], np.degrees(np.arctan2(volts[2*first+1], volts[2*first])).tolist()))
+        powers = np.concatenate([np.asarray(d.PDElements.AllPowers(), dtype=float), [0., 0.]])
+        currents = np.asarray(d.PDElements.AllMaxCurrents(), dtype=float)[lay['elements']]
+        r1, r2 = lay['rows1'], lay['rows2']
+        p1, q1 = powers[r1].sum(1)/1000, powers[r1+1].sum(1)/1000
+        p2, q2 = powers[r2].sum(1)/1000, powers[r2+1].sum(1)/1000
+        branches = dict(zip(lay['names'], zip(p1.tolist(), q1.tolist(), p2.tolist(), q2.tolist(), currents.tolist())))
         # Circuit.TotalPower sums every voltage source, so read each one: the mainland source and the
         # grid-forming batteries are reported separately.
         formers, main = {}, (0., 0.)

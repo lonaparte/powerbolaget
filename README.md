@@ -48,7 +48,7 @@ The interface has a day and a night palette. It starts in **Day**; the three but
 The design is documented in `docs/MODEL.md`, mapped section by section to the v0.2 specification.
 
 - **World core.** One authoritative state, one event clock, a double-entry money ledger and independent random streams. Events have sub-minute timestamps. Hour, day and month boundaries settle the completed period before anyone plans the next.
-- **Island.** About 55,000 residents in 18 economic zones. Zones are dense where people are dense, with seven in and around the main town of Västerhamn (the Visby counterpart). The countryside forms large zones around small coastal towns and inland service villages.
+- **Island.** About 55,000 residents in 18 economic zones, using about 900 GWh of electricity a year with a peak near 180 MW, like Gotland. About 40 % of it goes to the cement works, sized like Gotland's Slite plant. Six wind farms with 158 MW cover about 45 % of the island's use, as on Gotland. Zones are dense where people are dense, with seven in and around the main town of Västerhamn (the Visby counterpart). The countryside forms large zones around small coastal towns and inland service villages.
 - **Society.** About 190 POP objects (the cap is 10,000): residents grouped by zone and sector, visitors, holiday-home users and seasonal workers.
   - Daily: incomes, transfers and spending.
   - Tourism: arrivals, stays and departures, limited by beds and ferry seats.
@@ -84,7 +84,7 @@ Not modelled in 0.1.0:
 - `app/` is the headless simulation core. It runs in worker processes: OpenDSS contexts work only from the thread that created them. Each worker serves its sessions from its main thread and uses one CPU core. Configure with `POWERBOLAGET_WORKERS` (default 1), `POWERBOLAGET_MAX_SESSIONS` (default 8) and `POWERBOLAGET_IDLE_SECONDS` (default 1800).
 - If a worker restarts, browsers reload their saves automatically. Saves are untrusted input: ids, catalog references and sizes are checked before a world is rebuilt.
 - `web/` is the client: plain HTML, CSS and JavaScript, with no build step.
-- Measured on one core of a 2.1 GHz Xeon server: about 125 ms of computation per simulated hour (2 ms per simulated minute, of which about 1.1 ms is the power flow). That is about 3 s per simulated day, or 18 minutes per simulated year. `results/benchmark-365d.json` has the full record of a year run without any player input.
+- Measured on one core of a 2.1 GHz Xeon server: about 175 ms of computation per simulated hour (about 3 ms per simulated minute, of which about 1.5 ms is the power flow). That is about 4 s per simulated day, or 26 minutes per simulated year. `results/benchmark-365d.json` has the full record of a year run without any player input.
 
 Electrical calculation libraries are imported only in `app/solvers/`, behind one contract (`app/solvers/model.py`). `tests/test_solvers.py` fails if any other module imports one. OpenDSS (through OpenDSSDirect.py) is the default backend; pandapower was evaluated earlier and was about 35 times slower for this use.
 

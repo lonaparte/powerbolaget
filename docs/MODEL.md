@@ -20,7 +20,7 @@ Every coefficient that is not a measurement is an assumption. They are collected
 | 7. Society and economy hourly and daily, slow variables monthly; grid every minute; events at their own timestamps | Implemented. Transient-stability windows are deferred (see 6.2). |
 | 8. Every turbine is its own device with a real collector connection | Implemented. Each turbine has its own 0.69 kV bus, unit transformer and collector cable. |
 | 9. Hourly plans never step the load; real switching is not smoothed | Implemented; tested in `tests/test_world.py`. |
-| 10. No speed target; measure first | Measured: about 125 ms per simulated hour on one core of a 2.1 GHz Xeon server (`results/benchmark-365d.json`). |
+| 10. No speed target; measure first | Measured: about 175 ms per simulated hour on one core of a 2.1 GHz Xeon server, with 54 turbines (`results/benchmark-365d.json`). |
 | 11. Three views with layers, inspector and pinned objects | Implemented, in an HTML client (see 10.1). |
 | 12. Free investment with full bookkeeping; reference-price tariffs | Implemented. Shortfalls are booked as external financing. |
 
@@ -61,7 +61,7 @@ The game starts on 1 January, year 1 of the **Fantasy Era** (幻想纪元). The 
 
 Solvers only read a snapshot and return results (`app/solvers/`).
 
-Ids: `zone_id` z01–z18, `pop_id` `<zone>_<group>`, `firm_id`, `equipment_id` `<firm>_<key>`, `bus_id`, `branch_id`. A zone maps to buses through its 20 kV feeder bus; firms connect to their own bus (the cement works to `ind_kal`).
+Ids: `zone_id` z01–z18, `pop_id` `<zone>_<group>`, `firm_id`, `equipment_id` `<firm>_<key>`, `bus_id`, `branch_id`. A zone maps to buses through its 20 kV feeder bus; firms connect to their own bus (the cement works to `ind_kal`, behind its own 110/20 kV station).
 
 ## 3. Layered event coupling
 
@@ -99,7 +99,7 @@ Messages: firm and society plans (spec: ActivityPlan) become device targets and 
 ## 5. Economy
 
 - **Firms.** Large industry is modelled individually:
-  - a cement works with kiln, raw mills, cement mills and auxiliaries;
+  - a cement works with kiln, raw mills, cement mills, auxiliaries and site services, sized like Gotland's Slite plant: about 240 t of clinker an hour (about 2 Mt a year), about 40 MW of equipment and about 345 GWh a year, plus about 20 GWh for the quarry beside it (Region Gotland: the cement producer uses about 350 GWh);
   - two limestone quarries;
   - a dairy, a feed mill, a slaughterhouse and a brewery;
   - a ferry terminal with shore power on the sailing schedule;
@@ -128,7 +128,8 @@ Messages: firm and society plans (spec: ActivityPlan) become device targets and 
 
 - **Network.**
   - 110 kV ring between eight substations; 110/20 kV units with on-load tap changers; 20 kV feeders to every zone (a sea cable to the Fårö-like islet).
-  - Three wind farms, each with a 110/33 kV farm substation and 33 kV collector strings.
+  - Six wind farms with 54 turbines and 158 MW, each with a 110/33 kV farm substation and 33 kV collector strings. As on Gotland (about 180 MW), most capacity stands on the windy south-western headland, with more in the north-east and south-east.
+  - The cement works' own 110/20 kV station, fed from Kalkudden over 110 kV.
   - The existing HVDC: two links of 130 MW.
   - The planned HVAC: two 220 kV subsea cables, a 220/110 kV transformer at Stenkumla, and 110 kV connections to the link station and Romsta.
 - **Power flow.** OpenDSS through OpenDSSDirect.py (DSS-Extensions), every simulated minute, constant-PQ loads and generators.
@@ -139,7 +140,7 @@ Messages: firm and society plans (spec: ActivityPlan) become device targets and 
   - the island's current anomaly: the Weibull-calibrated weather times the 50 m seasonal cycle, with a long-term mean of 1;
   - a smooth random factor, about ±5 % (one standard deviation), correlated over roughly 12 km and 3 hours.
 
-  Calibration: before wakes and outages, the three existing farms reach capacity factors of 37 %, 32 % and 28 % (coast to inland). Gotland's real fleet produces about 450 GWh a year from about 180 MW, about 28 % (Energimyndigheten). Then come power curves with air density, cut-out with hysteresis, and icing stops. Wakes inside each farm use the Jensen (Park) model with root-sum-square superposition. FLORIS is not used (see Deferred).
+  Calibration: before wakes and outages, the first three farms reach capacity factors of 37 %, 32 % and 28 % (coast to inland). Gotland's real fleet produces about 450 GWh a year from about 180 MW, about 28 % (Energimyndigheten). Then come power curves with air density, cut-out with hysteresis, and icing stops. Wakes inside each farm use the Jensen (Park) model with root-sum-square superposition. FLORIS is not used (see Deferred).
 - **Dispatch** (automatic operator):
   - the mainland exchange stays within link ratings and a margin;
   - batteries shave import peaks, absorb surplus wind and follow price, keeping a reserve if grid-forming;
@@ -168,6 +169,7 @@ Messages: firm and society plans (spec: ActivityPlan) become device targets and 
 - **Heating.** Each zone has a single-node thermal model: an indoor temperature with a setback schedule, heat-pump COP depending on outdoor temperature, and electric shares of direct heating and heat pumps. Outages cool homes, and reconnection produces cold-load pickup.
 - **Equipment.** State machines (off, starting, running, stopping, tripped, warm-up). Starts and stops are events at their own times.
 - **Mapping.** Each device is attached to one bus. The zone and firm ids show who pays and who is affected.
+- **Calibration.** Region Gotland reports 850–1,000 GWh a year for the island, about 350 GWh of it the cement works. That leaves about 9.4 MWh per resident for everything else. The shapes above give about 75 % of that, so the requests of homes, services, public buildings, lodging and farms are scaled by 1.25 (`DEMAND_SCALE` in `app/params.py`; assumption: the missing use is spread like the modelled use). Over a simulated year the island then uses about 900 GWh, with a peak of 178 MW (Gotland: about 180 MW).
 
 ## 8. Interfaces
 

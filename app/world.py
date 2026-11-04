@@ -366,6 +366,8 @@ class World:
         """On-load tap changers of the 110/20 kV units keep each substation's 20 kV busbar within
         1.00-1.04 pu, one 1.25 % step per minute at most."""
         regulated = [(sub['mv_bus'], sub['transformers']) for sub in self.substations.values()]
+        if 't_ind_kal_1' in self.grid['branches']:
+            regulated.append(('ind_kal', ['t_ind_kal_1', 't_ind_kal_2']))
         ac = self.grid.get('hvac')
         if ac and not self.grid['branches'][ac['transformer']].get('planned'):
             regulated.append(('stk_110', [ac['transformer']]))

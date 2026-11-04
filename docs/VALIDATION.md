@@ -19,7 +19,7 @@ Everything below was run on 4 November 2026 on the release commit's code. The ma
 | | `test_hourly_plans_do_not_step_the_load` | Over three hours, no aggregated load changes across an hour boundary by more than four times its median minute-to-minute change. |
 | | `test_every_minute_balances_power` | At the end of a day: mainland exchange + wind + storage = served load + losses, within 0.05 MW. |
 | | `test_energy_bookkeeping_matches_the_minutes` | Hourly energy equals the integral of the minutes; served ≤ requested; wind ≤ available. |
-| | `test_outage_trips_equipment_at_once_and_restart_waits` | Opening the cement works' feeder trips the kiln at once. After reclosing, the kiln is still in warm-up while homes are already served again. |
+| | `test_outage_trips_equipment_at_once_and_restart_waits` | Opening the cement works' 110 kV line trips the kiln at once. After reclosing, the kiln is still in warm-up while homes are already served again. |
 | | `test_fault_protection_and_repair_restore_supply` | A fault on the 20 kV feeder to Sudret trips it and de-energises the zone. Supply returns after auto-reclose or repair. |
 | | `test_a_feeder_fault_is_sectionalised_before_the_repair` | A cable fault on a single-circuit feeder trips it. Within 150 minutes, switching re-feeds the zone except the 15–35 % on the faulted section, who are served again after the repair. A fault on the islet's sea cable leaves the islet dark until repair. |
 | | `test_grid_forming_battery_carries_the_island_when_the_link_is_lost` | With both HVDC links lost, a 60 MW grid-forming battery becomes the voltage source, discharges and keeps most load served. |
@@ -74,11 +74,28 @@ Each place's long-term mean at 100 m comes from the Global Wind Atlas, averaged 
 
 | Farm | Atlas mean at 100 m | Mean at hub height | Capacity factor |
 |---|---|---|---|
-| Uddens vindpark (south-western headland, PB-2.3, 80 m) | 9.0 m/s | 8.5 m/s | 36.5 % |
-| Östergarns vindpark (east coast, PB-3.6, 100 m) | 7.9 m/s | 7.9 m/s | 31.8 % |
-| Nordheds vindpark (northern interior, PB-2.3, 80 m) | 7.8 m/s | 7.4 m/s | 28.3 % |
+| Uddens vindpark (10 × PB-2.3, 80 m, south-western headland) | 9.0 m/s | 8.5 m/s | 36.5 % |
+| Östergarns vindpark (8 × PB-3.6, 100 m, east coast) | 7.9 m/s | 7.9 m/s | 34.1 % |
+| Nordheds vindpark (8 × PB-2.3, 80 m, northern interior) | 7.8 m/s | 7.4 m/s | 29.2 % |
+| Näsuddens vindpark II (10 × PB-3.6, 100 m, south-western headland) | 9.0 m/s | 9.0 m/s | 43.8 % |
+| Ruteparken (10 × PB-2.3, 80 m, north-eastern forest) | 7.0 m/s | 6.8 m/s | 20.4 % |
+| Havdhems vindpark (8 × PB-3.6, 100 m, south-east) | 7.3 m/s | 7.3 m/s | 26.9 % |
 
-For comparison, Gotland's real fleet of about 180 MW, many of them older and smaller turbines, produces about 450 GWh a year, a capacity factor of about 28 %. In the year run, after wakes, outages and curtailment, the farms produced 180.9 GWh: a capacity factor of 29.4 %. Before this calibration, hub winds were derived from the NASA grid cell alone (mostly sea, with little shear); the farms reached only 20–26 % before wakes and 19 % after.
+For comparison, Gotland's real fleet of about 180 MW, many of them older and smaller turbines, produces about 450 GWh a year, a capacity factor of about 28 %. In the year run, after wakes, outages and curtailment, the 158 MW fleet produced 401 GWh: a capacity factor of 29.0 %. Before this calibration, hub winds were derived from the NASA grid cell alone (mostly sea, with little shear); the farms reached only 20–26 % before wakes and 19 % after.
+
+### Consumption against Gotland
+
+Region Gotland reports 850–1,000 GWh a year for the island, about 350 GWh of it the cement works. An Energimyndigheten overview gives a maximum load of about 180 MW and about 180 MW of wind producing about 450 GWh (about 45 % of use). The game island has 55,300 residents (Gotland about 61,000). One simulated year (seed 1):
+
+| Measure | Gotland | Before calibration | Model |
+|---|---|---|---|
+| Electricity use | 850–1,000 GWh | 638 GWh | 903 GWh |
+| Cement works | about 350 GWh | about 195 GWh | 350 GWh, plus 26 GWh for the quarries |
+| Peak load | about 180 MW | 133 MW | 178 MW |
+| Wind capacity | about 180 MW | 70 MW | 158 MW |
+| Wind share of use | about 45 % | 18–28 % | 44.4 % |
+
+Breakdown of the model's 903 GWh: homes 239, the cement works 350, services 100, lodging 63, public buildings 52, farms 27, quarries 26, other industry (dairy, slaughterhouse, feed mill, brewery, grain dryers) 27, the hospital 12 and the ferry terminal 7 GWh. Homes, services, public buildings, lodging and farms carry a calibration factor of 1.25 (`DEMAND_SCALE`); no public sector split for Gotland was found to calibrate them separately.
 
 ## Another OpenDSS finding
 
@@ -90,17 +107,17 @@ OpenDSS `Circuit.TotalPower` adds up every voltage source. While a grid-forming 
 
 | Measure | Result |
 |---|---|
-| Computation | 1,153 s for 365 days: 129.9 ms per simulated hour on average, 142 ms at the 95th percentile. |
-| Power flow | 1.13 ms median and 1.78 ms at the 95th percentile per solve. No numerical failures. |
-| Memory and saves | Peak 119 MB; a save is 1.5 MB. |
+| Computation | 1,555 s for 365 days: 175 ms per simulated hour on average, 191 ms at the 95th percentile (54 turbines). |
+| Power flow | 1.51 ms median and 2.21 ms at the 95th percentile per solve. No numerical failures. |
+| Memory and saves | Peak 161 MB; a save is 1.6 MB. |
 | Money | All accounts sum to 0.000 at the end of every day. |
-| Energy | Load 637.8 GWh; wind 180.9 GWh (28.4 % of load; a capacity factor of 29.4 % after wakes, outages and curtailment); import 473.9 GWh; export 1.5 GWh. Peak 133.0 MW on 6 Jan; the lowest daily peak was 63.6 MW. |
-| Supply | 26.8 MWh unserved (0.004 % of load). The largest event was an ice-load fault on 17 Dec on the single-circuit feeder to Östernäs. The zone was out for two hours until switching re-fed it; then 34 % of it waited five more hours for the repair. |
-| Population | 55,300 → 54,985: 525 births, 626 deaths, 1,418 immigrants and 1,632 emigrants. Region Gotland's forecast for 2025–2035, scaled to the same population, has about 2,300 people moving in and 2,180 moving out each year, so the model's gross flows are about two-thirds of that. |
+| Energy | Load 903.3 GWh; wind 401.2 GWh (44.4 % of load; a capacity factor of 29.0 % after wakes, outages and curtailment); import 561.0 GWh; export 28.0 GWh. Peak 178.5 MW on 6 Jan; the lowest daily peak was 93.0 MW. |
+| Supply | 299 MWh unserved (0.03 % of load), mostly from two radial supplies. On 30 Nov the sea cable to the islet (Fårholm) failed, and its 500 residents waited 98 hours for the repair because nothing else can feed the islet. On 9 Apr a permanent fault on the single 110 kV line from Hemby to Sudret cut the Sudret zone, and with it the two Näsudden wind farms, for 14 hours. |
+| Population | 55,300 → 55,003: 522 births, 639 deaths, 1,465 immigrants and 1,645 emigrants. Region Gotland's forecast for 2025–2035, scaled to the same population, has about 2,300 people moving in and 2,180 moving out each year, so the model's gross flows are about two-thirds of that. |
 | Visitors | Up to 16,600 at once. Lodging was full for 61 days in high summer. |
-| Labour | 1,579 unemployed at the start (5.1 %), 3,623 in May, 359 in September and 2,187 at the end of the year (7.1 %). |
+| Labour | 1,579 unemployed at the start (5.1 %), 3,605 in May, 402 in September and 2,191 at the end of the year (7.1 %). |
 | Firms | On 1 Sep an investor decided to build an 8 MW data centre, with a grid connection; firms went from 69 to 70. |
-| Powerbolaget | Cash went from 400 to 594 MSEK. |
+| Powerbolaget | Cash went from 400 to 732 MSEK. |
 
 The first year run found two faults in the model, both now fixed:
 - **Out-migration was missing.** In that run 1,325 people moved to the island but only 71 left, so unemployment drifted upward. Retirees were also counted as unemployed in the migration step. Off-island moves now have a base rate for life reasons, 40 % of school leavers leave to study or work, and immigration falls faster when unemployment is above 5 %.
@@ -111,5 +128,6 @@ The first year run found two faults in the model, both now fixed:
 - No comparison against measured Gotland load, wind output or economic statistics. Every coefficient outside the NASA POWER climatology is an assumption.
 - No dynamic (RMS or EMT) validation; the model has no dynamics.
 - Unemployment is seasonal, but it peaks in May instead of in winter. The seasonal labour pattern is not calibrated.
+- No mobile reserve generators: customers behind a radial supply (the islet's sea cable, the line to Sudret) wait for the repair. Distribution operators usually bring in mobile generators for long repairs.
 - Wind: the Global Wind Atlas is a model product, and its local error on Gotland has not been checked against mast measurements. Turbine output is compared only with the island-wide production figure.
 - Browser tests run in Chromium only.

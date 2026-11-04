@@ -29,13 +29,16 @@ INDUSTRY = [
 # Equipment per kind: key, name, MW, power factor, priority class, ramp min, restart min, warm-up min, warm-up share,
 # production role and rate (output units per hour while running).
 EQUIPMENT = {
-    # Power factors include the plant's capacitor banks.
-    'cement': [('kiln', 'Kiln line', 6.6, .94, 'industry', 25, 30, 480, .35, 'clinker', 118.),
-               ('aux', 'Coal mill and kiln auxiliaries', 1.6, .93, 'industry', 5, 15, 0, 0., 'aux', 0.),
-               ('rawmill1', 'Raw mill 1', 3.2, .94, 'flexible', 4, 20, 0, 0., 'rawmeal', 96.),
-               ('rawmill2', 'Raw mill 2', 3.2, .94, 'flexible', 4, 20, 0, 0., 'rawmeal', 96.),
-               ('cmill1', 'Cement mill 1', 4.3, .94, 'flexible', 4, 20, 0, 0., 'cement', 72.),
-               ('cmill2', 'Cement mill 2', 4.3, .94, 'flexible', 4, 20, 0, 0., 'cement', 72.)],
+    # Power factors include the plant's capacitor banks. The cement works is sized like Gotland's Slite
+    # plant: about 2 Mt of clinker a year and about 340 GWh of electricity with its quarry about 20 GWh
+    # more (Region Gotland: the cement producer uses about 350 GWh of the island's 850-1,000 GWh).
+    'cement': [('kiln', 'Kiln line', 12.0, .94, 'industry', 25, 30, 480, .35, 'clinker', 240.),
+               ('aux', 'Coal mill and kiln auxiliaries', 3.5, .93, 'industry', 5, 15, 0, 0., 'aux', 0.),
+               ('rawmill1', 'Raw mill 1', 6.0, .94, 'flexible', 4, 20, 0, 0., 'rawmeal', 230.),
+               ('rawmill2', 'Raw mill 2', 6.0, .94, 'flexible', 4, 20, 0, 0., 'rawmeal', 230.),
+               ('cmill1', 'Cement mill 1', 7.5, .94, 'flexible', 4, 20, 0, 0., 'cement', 160.),
+               ('cmill2', 'Cement mill 2', 7.5, .94, 'flexible', 4, 20, 0, 0., 'cement', 160.),
+               ('site', 'Packing, conveyors and site services', 2.5, .9, 'commercial', 2, 10, 0, 0., 'aux', 0.)],
     'quarry': [('crusher1', 'Primary crusher', 1.4, .84, 'commercial', 2, 10, 0, 0., 'limestone', 380.),
                ('crusher2', 'Secondary crusher and conveyors', 1.0, .84, 'commercial', 2, 10, 0, 0., 'limestone', 0.)],
     'dairy': [('cooling', 'Cold storage', .7, .9, 'industry', 1, 5, 0, 0., 'cooling', 0.),
@@ -48,6 +51,10 @@ EQUIPMENT = {
              ('shore', 'Ferry shore power', 1.8, .92, 'commercial', 1, 2, 0, 0., '', 0.)],
     'hospital': [('hospital', 'Hospital', 1.35, .93, 'critical', 1, 1, 0, 0., '', 0.)],
 }
+CEMENT_RATE = {e[0]: e[10] for e in EQUIPMENT['cement']}
+# The large quarry next to the cement works has two crushing lines (twice the equipment of the small one).
+QUARRY_RATE = {'f_quarry_n': 800., 'f_quarry_s': 180.}
+QUARRY_SCALE = {'f_quarry_n': 2.1, 'f_quarry_s': 1.}
 # Inputs per unit of each production role.
 RECIPE = {'rawmeal': {'limestone': 1.0}, 'clinker': {'rawmeal': 1.55, 'fuel': .82}, 'cement': {'clinker': .93},
           'limestone': {}, 'food_dairy': {'milk': 6.2}, 'feed': {'grain': 1.0}, 'food_slaughter': {'livestock': 1.65},
@@ -86,6 +93,7 @@ def create_firms(world):
         f = firm(fid, name, kind, sector, zid, bus, output, scope, desired_staff=staff)
         for key, ename, mw, pf, prio, ramp, restart, warm, share, role, rate in EQUIPMENT.get(kind, []):
             did = f'{fid}_{key}'
+            mw *= QUARRY_SCALE.get(fid, 1.)
             devices[did] = L.equipment(did, ('firm', fid), bus, ename, mw, pf, prio, ramp, restart, warm, share, role, rate)
             f['equipment'].append(did)
         if kind == 'construction':
@@ -94,10 +102,10 @@ def create_firms(world):
             f['devices'].append(did)
         firms[fid] = f
     c = firms['f_cement']
-    c['inventory'] = dict(limestone=18000., rawmeal=7000., clinker=36000., cement=28000., fuel=5200.)
-    c['limits'] = dict(rawmeal=12000., clinker=60000., cement=52000.)
-    firms['f_quarry_n']['inventory'] = dict(limestone=42000.)
-    firms['f_quarry_n']['limits'] = dict(limestone=70000.)
+    c['inventory'] = dict(limestone=36000., rawmeal=14000., clinker=72000., cement=56000., fuel=10400.)
+    c['limits'] = dict(rawmeal=24000., clinker=120000., cement=104000.)
+    firms['f_quarry_n']['inventory'] = dict(limestone=84000.)
+    firms['f_quarry_n']['limits'] = dict(limestone=140000.)
     firms['f_quarry_s']['inventory'] = dict(limestone=9000.)
     firms['f_quarry_s']['limits'] = dict(limestone=20000.)
     firms['f_dairy']['inventory'] = dict(milk=180., food=60.)
@@ -171,6 +179,7 @@ def plan_hour(world, now):
             expensive = price > 1.2*avg
             kiln_ok = inv['rawmeal'] > 400 and inv['fuel'] > 200 and inv['clinker'] < .97*lim['clinker']
             want['kiln'] = want['aux'] = kiln_ok and not f.get('kiln_stop')
+            want['site'] = True
             raw = inv['rawmeal']/lim['rawmeal']
             raw_need = inv['limestone'] > 300 and (raw < .35 or (raw < .92 and not expensive))
             want['rawmill1'] = raw_need
@@ -243,15 +252,15 @@ def settle_hour(world, start, end):
             d['run_min'] = 0.
         inv = f['inventory']
         if kind == 'cement':
-            produce(f, 'rawmeal', (run['rawmill1']+run['rawmill2'])*96., RECIPE['rawmeal'])
+            R = CEMENT_RATE
+            produce(f, 'rawmeal', run['rawmill1']*R['rawmill1']+run['rawmill2']*R['rawmill2'], RECIPE['rawmeal'])
             if run['aux'] > .5:
-                produce(f, 'clinker', run['kiln']*118., RECIPE['clinker'])
-            produce(f, 'cement', (run['cmill1']+run['cmill2'])*72., RECIPE['cement'], output=True)
+                produce(f, 'clinker', run['kiln']*R['kiln'], RECIPE['clinker'])
+            produce(f, 'cement', run['cmill1']*R['cmill1']+run['cmill2']*R['cmill2'], RECIPE['cement'], output=True)
             for k, lim in f['limits'].items():
                 inv[k] = min(inv[k], lim)
         elif kind == 'quarry':
-            rate = 380. if f['id'] == 'f_quarry_n' else 180.
-            produce(f, 'limestone', min(run['crusher1'], run['crusher2'])*rate, {}, output=True)
+            produce(f, 'limestone', min(run['crusher1'], run['crusher2'])*QUARRY_RATE[f['id']], {}, output=True)
         elif kind == 'dairy':
             produce(f, 'food', run['line']*16./6.2, RECIPE['food_dairy'], output=True)
         elif kind == 'feedmill':
@@ -385,7 +394,7 @@ def reserve(f, good):
 
 def export_surplus(world, minute):
     """Sellers ship stock above their target to the mainland at export parity (limited ship capacity)."""
-    plans = [('f_cement', 'cement', .25, 3400.), ('f_quarry_n', 'limestone', .55, 4200.), ('f_quarry_s', 'limestone', .5, 1500.)]
+    plans = [('f_cement', 'cement', .25, 7200.), ('f_quarry_n', 'limestone', .55, 4200.), ('f_quarry_s', 'limestone', .5, 1500.)]
     for fid, good, keep, cap in plans:
         f = world.firms.get(fid)
         if not f or f['status'] != 'operating':
@@ -428,7 +437,7 @@ def ship(world, f, good, qty, minute):
 def restock_inputs(world, minute):
     """Firms buy inputs toward a few days of planned use."""
     wanted = {
-        'f_cement': [('limestone', 26000.), ('fuel', 6000.)],
+        'f_cement': [('limestone', 52000.), ('fuel', 12000.)],
         'f_dairy': [('milk', 260.)], 'f_feed': [('grain', 1100.)], 'f_slaughter': [('livestock', 70.)],
         'f_brewery': [('grain', 90.)],
     }
@@ -533,7 +542,7 @@ def close_day(world, minute):
 
 
 def capacity_per_day(f):
-    rates = {'cement': 144*24, 'quarry': (380 if f['id'] == 'f_quarry_n' else 180)*14, 'dairy': 16/6.2*16,
+    rates = {'cement': (CEMENT_RATE['cmill1']+CEMENT_RATE['cmill2'])*24, 'quarry': QUARRY_RATE.get(f['id'], 180.)*14, 'dairy': 16/6.2*16,
              'feedmill': 12*9, 'slaughter': 2.2/1.65*9, 'brewery': .9*9}
     return rates.get(f['kind'], 1.)
 
