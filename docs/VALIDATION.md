@@ -78,7 +78,7 @@ Each place's long-term mean at 100 m comes from the Global Wind Atlas, averaged 
 | Östergarns vindpark (east coast, PB-3.6, 100 m) | 7.9 m/s | 7.9 m/s | 31.8 % |
 | Nordheds vindpark (northern interior, PB-2.3, 80 m) | 7.8 m/s | 7.4 m/s | 28.3 % |
 
-For comparison, Gotland's real fleet of about 180 MW, many of them older and smaller turbines, produces about 450 GWh a year, a capacity factor of about 28 %. Before this calibration, hub winds were derived from the NASA grid cell alone (mostly sea, with little shear) and the farms reached only 20–26 %.
+For comparison, Gotland's real fleet of about 180 MW, many of them older and smaller turbines, produces about 450 GWh a year, a capacity factor of about 28 %. In the year run, after wakes, outages and curtailment, the farms produced 180.9 GWh: a capacity factor of 29.4 %. Before this calibration, hub winds were derived from the NASA grid cell alone (mostly sea, with little shear); the farms reached only 20–26 % before wakes and 19 % after.
 
 ## Another OpenDSS finding
 
@@ -90,17 +90,17 @@ OpenDSS `Circuit.TotalPower` adds up every voltage source. While a grid-forming 
 
 | Measure | Result |
 |---|---|
-| Computation | 1,081 s for 365 days: 121.8 ms per simulated hour on average, 133 ms at the 95th percentile. |
-| Power flow | 1.17 ms median and 1.81 ms at the 95th percentile per solve. No numerical failures. |
-| Memory and saves | Peak 113 MB; a save is 1.5 MB. |
+| Computation | 1,153 s for 365 days: 129.9 ms per simulated hour on average, 142 ms at the 95th percentile. |
+| Power flow | 1.13 ms median and 1.78 ms at the 95th percentile per solve. No numerical failures. |
+| Memory and saves | Peak 119 MB; a save is 1.5 MB. |
 | Money | All accounts sum to 0.000 at the end of every day. |
-| Energy | Load 637.8 GWh; wind 116.7 GWh (18.3 %); import 535.9 GWh; export 0.4 GWh. Peak 133.0 MW on 6 Jan; the lowest daily peak was 63.6 MW. |
+| Energy | Load 637.8 GWh; wind 180.9 GWh (28.4 % of load; a capacity factor of 29.4 % after wakes, outages and curtailment); import 473.9 GWh; export 1.5 GWh. Peak 133.0 MW on 6 Jan; the lowest daily peak was 63.6 MW. |
 | Supply | 26.8 MWh unserved (0.004 % of load). The largest event was an ice-load fault on 17 Dec on the single-circuit feeder to Östernäs. The zone was out for two hours until switching re-fed it; then 34 % of it waited five more hours for the repair. |
 | Population | 55,300 → 54,985: 525 births, 626 deaths, 1,418 immigrants and 1,632 emigrants. Region Gotland's forecast for 2025–2035, scaled to the same population, has about 2,300 people moving in and 2,180 moving out each year, so the model's gross flows are about two-thirds of that. |
 | Visitors | Up to 16,600 at once. Lodging was full for 61 days in high summer. |
 | Labour | 1,579 unemployed at the start (5.1 %), 3,623 in May, 359 in September and 2,187 at the end of the year (7.1 %). |
 | Firms | On 1 Sep an investor decided to build an 8 MW data centre, with a grid connection; firms went from 69 to 70. |
-| Powerbolaget | Cash went from 400 to 551 MSEK. |
+| Powerbolaget | Cash went from 400 to 594 MSEK. |
 
 The first year run found two faults in the model, both now fixed:
 - **Out-migration was missing.** In that run 1,325 people moved to the island but only 71 left, so unemployment drifted upward. Retirees were also counted as unemployed in the migration step. Off-island moves now have a base rate for life reasons, 40 % of school leavers leave to study or work, and immigration falls faster when unemployment is above 5 %.
