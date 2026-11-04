@@ -53,6 +53,14 @@ test('the island starts running on its own and every view renders', {timeout: 90
   await page.click('[data-tab="firms"]');
   await page.waitForSelector('#econ table tbody tr');
   await page.click('[data-view="island"]');
+  // The day theme is the default; night and the day/night cycle are switched on by hand and remembered.
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'day');
+  await page.click('[data-theme-mode="night"]');
+  assert.equal(await page.evaluate(() => [document.documentElement.dataset.theme, PB.light()].join()), 'night,0');
+  await page.click('[data-theme-mode="auto"]');
+  assert.equal(await page.evaluate(() => localStorage.getItem('pb-theme-mode')), 'auto');
+  await page.getByLabel('Wind field').check();
+  await page.waitForTimeout(300);
   assert.deepEqual(errors, []);
 });
 

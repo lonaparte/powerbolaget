@@ -219,7 +219,7 @@
   // ------------------------------------------------------------ controls
   $('play').onclick = () => { PB.running = !PB.running; updatePlay(); };
   document.querySelectorAll('[data-speed]').forEach(b => b.onclick = () => { PB.speed = Number(b.dataset.speed); paceEma = null; document.querySelectorAll('[data-speed]').forEach(x => x.classList.toggle('on', x === b)); });
-  $('themeToggle').onclick = PB.cycleTheme;
+  document.querySelectorAll('[data-theme-mode]').forEach(b => b.onclick = () => PB.setTheme(b.dataset.themeMode));
   $('alerts').onclick = () => { PB.unread = 0; setDock('events'); topbar(PB.snap); };
   document.addEventListener('keydown', ev => {
     if (ev.target.matches('input,select,textarea')) return;

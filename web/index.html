@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en" data-theme="day"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Powerbolaget · Gutnö</title>
 <link rel="preload" href="/pixel-font.woff" as="font" type="font/woff" crossorigin>
 <link rel="stylesheet" href="/style.css"></head>
@@ -25,7 +25,9 @@
    <button data-menu="about">Model and sources</button>
   </div>
  </div>
- <button id="themeToggle" class="tb theme" title="Day and night theme">◐</button>
+ <div class="speeds themes" role="group" aria-label="Day and night">
+  <button data-theme-mode="day" title="Day">☀</button><button data-theme-mode="night" title="Night">☾</button><button data-theme-mode="auto" title="Day/night cycle: follows the simulated sun">◐</button>
+ </div>
  <input id="importFile" type="file" accept=".json,application/json" hidden>
 </header>
 <div id="app">

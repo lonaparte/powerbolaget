@@ -91,21 +91,23 @@ PB.apply = snap => {
   PB.emit('snapshot', snap);
 };
 
-// ---------------------------------------------------------------- theme: follows the simulated sun unless fixed
-PB.themeMode = (() => { try { return localStorage.getItem('pb-theme') || 'auto'; } catch { return 'auto'; } })();
+// ---------------------------------------------------------------- theme: day by default; night, or a day/night cycle that follows the simulated sun
+PB.themeMode = (() => { try { const m = localStorage.getItem('pb-theme-mode'); return ['day', 'night', 'auto'].includes(m) ? m : 'day'; } catch { return 'day'; } })();
 PB.daylight = () => {
   const s = PB.snap; if (!s) return 0;
   const h = s.hour + s.minute_of_hour / 60, rise = s.weather.sunrise ?? 7, set = s.weather.sunset ?? 17;
   return PB.clamp((h - rise + .5) / 1) * PB.clamp((set + .5 - h) / 1);
 };
+// Light level the map is drawn with: full day, full night, or the simulated sun.
+PB.light = () => PB.themeMode === 'auto' ? PB.daylight() : PB.themeMode === 'day' ? 1 : 0;
 PB.theme = () => {
   const name = PB.themeMode === 'auto' ? (PB.daylight() >= .5 ? 'day' : 'night') : PB.themeMode;
   if (document.documentElement.dataset.theme !== name) { document.documentElement.dataset.theme = name; PB.emit('theme', name); }
-  const b = PB.$('themeToggle'); if (b) { b.textContent = {auto: '◐', day: '☀', night: '☾'}[PB.themeMode]; b.title = `Theme: ${PB.themeMode} (click to change)`; }
+  document.querySelectorAll('[data-theme-mode]').forEach(b => b.classList.toggle('on', b.dataset.themeMode === PB.themeMode));
 };
-PB.cycleTheme = () => {
-  PB.themeMode = {auto: 'day', day: 'night', night: 'auto'}[PB.themeMode];
-  try { localStorage.setItem('pb-theme', PB.themeMode); } catch {}
+PB.setTheme = mode => {
+  PB.themeMode = mode;
+  try { localStorage.setItem('pb-theme-mode', mode); } catch {}
   PB.theme();
 };
 PB.css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();

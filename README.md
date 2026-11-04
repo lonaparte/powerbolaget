@@ -30,7 +30,7 @@ Saves live in your browser, not on the server, so restarting or updating the ser
 
 The screen has three views of the same world, a context inspector on the right and a dock at the bottom.
 
-- **Island**: the pixel-art map. Land use is drawn from the island's 0.5 km parcels: towns, villages, farmland, forest, limestone heath (alvar), wetland, quarries, nature reserves and shore. You can switch on layers for zone borders, wind, turbine wakes, population, tourism, industry, load density, outages and power lines. Seasons, snow, night and town lights follow the simulation, and a town goes dark where it loses supply.
+- **Island**: the pixel-art map. Land use is drawn from the island's 0.5 km parcels: towns, villages, farmland, forest, limestone heath (alvar), wetland, quarries, nature reserves and shore. You can switch on layers for zone borders, wind, turbine wakes, population, tourism, industry, load density, outages and power lines. Seasons and snow follow the simulation. At night (Night, or the day/night cycle after sunset) towns light up, and a town goes dark where it loses supply. Wind arrows are fixed to the map, longer over open sea and shorter over forest and towns.
 - **Grid**: the electrical network on the same map. Buses are coloured by voltage and branches by loading, and moving dots show the power flow. Open or tripped breakers show as red dashes, de-energised areas as grey.
 - **Economy**: socio-economic statistics, with pages for overview, regions, POPs, firms, markets, finance and demography.
 - **Inspector**: click anything to see its current values, history and causes:
@@ -41,7 +41,7 @@ The screen has three views of the same world, a context inspector on the right a
 - **Operate**: start and end turbine maintenance, open and close breakers, set battery modes and the link operating margin.
 - **Time**: the clock runs by itself. Space pauses. Speeds are 10 simulated minutes, 1 hour, 6 hours or 1 day per second, as fast as the server allows. The dock shows the island balance minute by minute for the last four hours and hour by hour for the last three days, plus events, projects (yours, firms' expansions and the grid operator's) and pinned objects.
 
-The interface has a day and a night palette. In **Auto** mode it follows the simulated sun; the header toggle switches between Auto, Day and Night.
+The interface has a day and a night palette. It starts in **Day**; the three buttons at the top right switch between Day, Night and a day/night cycle that follows the simulated sun.
 
 ## What is simulated
 

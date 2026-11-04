@@ -34,7 +34,7 @@ Everything below was run on 4 November 2026 on the release commit's code. The ma
 | | `test_opening_a_branch_leaves_a_sane_solution[opendss]` | Regression test, see below. |
 
 Browser tests (`node --test tests/browser_game.cjs`, Playwright with Chromium): **4 passed**.
-- The game runs on its own after the page opens and every view renders.
+- The game runs on its own after the page opens and every view renders. It opens in the day theme; night and the day/night cycle can be switched on and are remembered.
 - A parcel shows its land, wind and turbine site, and a turbine can be built there.
 - Reloading the page continues from the browser save.
 - The layout fits a phone screen without horizontal scrolling.

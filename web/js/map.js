@@ -84,7 +84,7 @@ PB.map = (() => {
   }
   function buildTerrain() {
     const st = PB.static, s = PB.snap, Ld = PB.land;
-    const light = Math.round(PB.daylight() * 4) / 4, season = seasonOf(s), snow = s.weather.temp < .5 && season === 'winter';
+    const light = Math.round(PB.light() * 4) / 4, season = seasonOf(s), snow = s.weather.temp < .5 && season === 'winter';
     const key = [view.cx.toFixed(3), view.cy.toFixed(3), view.z.toFixed(3), W, H, light, season, snow, layers.island.zones, mode].join();
     if (key === terrainKey) return;
     terrainKey = key;
@@ -192,7 +192,7 @@ PB.map = (() => {
     ctx.globalAlpha = 1; ctx.drawImage(terrain, 0, 0);
     if (mode === 'grid') { ctx.fillStyle = document.documentElement.dataset.theme === 'day' ? 'rgba(248,240,220,.55)' : 'rgba(9,13,27,.55)'; ctx.fillRect(0, 0, W, H); }
     if (zoneFill) ctx.drawImage(zoneFill, 0, 0);
-    const s = PB.snap, st = PB.static, night = 1 - PB.daylight();
+    const s = PB.snap, st = PB.static, night = 1 - PB.light();
     if (mode === 'island') { if (layers.island.wind) drawWind(s); if (layers.island.wake) drawWakes(s); }
     if (mode === 'island' && night > .2) drawLights(s, night);
     if (mode === 'grid' || layers.island.grid) drawBranches(s, st);
@@ -215,13 +215,26 @@ PB.map = (() => {
       R(px, py, 1, 1, k % 5 ? '#ffd27a' : '#fff1c2');
     }
   }
+  // Surface wind for display: open sea and shore are windier, forest and towns slow it down.
+  const WIND_SURFACE = {'~': 1.15, b: 1.1, a: 1, f: 1, w: 1, q: .95, r: .95, v: .88, F: .82, T: .75};
   function drawWind(s) {
-    const step = Math.max(10, Math.round(9 * view.z)), dir = (s.weather.dir + 180) * Math.PI / 180, len = 2 + s.weather.wind * .9;
-    const ux = Math.sin(dir), uy = -Math.cos(dir), phase = (frame * s.weather.wind * .06) % step;
-    for (let py = step / 2; py < H; py += step) for (let px = step / 2; px < W; px += step) {
-      const ox = px + ux * phase, oy = py + uy * phase;
-      L(ox, oy, ox + ux * len, oy + uy * len, 'rgba(255,255,255,.55)');
-      R(ox + ux * len, oy + uy * len, 1, 1, '#ffffff');
+    // Arrows sit on a grid fixed in km, so they pan and zoom with the map; the grid coarsens as you zoom out.
+    let km = .5; while (km * view.z < 16) km *= 2;
+    const dir = (s.weather.dir + 180) * Math.PI / 180, ux = Math.sin(dir), uy = Math.cos(dir);   // blowing towards, km axes (north up)
+    const drift = ((frame * s.weather.wind * .0025) % 1) * km;
+    const [xa, ya] = toKm(0, H), [xb, yb] = toKm(W, 0), bright = PB.light() > .5;
+    for (let gy = Math.floor(ya / km - 1) * km; gy <= yb + km; gy += km) for (let gx = Math.floor(xa / km - 1) * km; gx <= xb + km; gx += km) {
+      const x = gx + ux * drift, y = gy + uy * drift, k = cellAt(x, y), cls = k < 0 ? '~' : PB.land.classes[k], surface = WIND_SURFACE[cls] ?? 1;
+      const gust = .85 + .3 * noise(x * .15 + frame * .004, y * .15);
+      const len = Math.min(km * view.z * .8, (2 + s.weather.wind * .9) * surface * gust);
+      const [px, py] = toPx(x, y), ex = px + ux * len, ey = py - uy * len;
+      if (bright && cls !== '~') {   // light land (and snow) in daylight: dark arrows
+        L(px, py, ex, ey, 'rgba(30,44,70,.6)');
+        R(ex, ey, 1, 1, '#1e2c46');
+      } else {
+        L(px, py, ex, ey, 'rgba(255,255,255,.6)');
+        R(ex, ey, 1, 1, '#ffffff');
+      }
     }
   }
   function drawWakes(s) {
