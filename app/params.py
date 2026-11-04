@@ -63,6 +63,11 @@ TOURIST_BUDGET_DAY = 900.        # SEK per visitor and day besides lodging (meal
 # Demography (per year).
 BIRTH_RATE = .0092
 DEATH_RATE = .0108
-MOVE_RATE = .055                 # share of working-age residents who consider moving each year
-EMIGRATION_SHARE = .35           # of movers, how many look off-island
+MOVE_RATE = .055                 # share of working-age residents who consider moving within the island each year
+# Off-island moves for life reasons (study, partners, careers) happen whatever the local economy does;
+# Gotland loses about 4 % of its residents to the mainland each year and gains about as many.
+EMIGRATION_RATE = .035           # working-age residents leaving per year
+EMIGRATION_RATE_RETIRED = .008
+UNEMPLOYED_EXIT = .12            # extra share of the unemployed leaving per year
+STUDY_LEAVE_SHARE = .4           # school leavers who go to the mainland to study or work
 IMMIGRATION_PER_YEAR = 1800

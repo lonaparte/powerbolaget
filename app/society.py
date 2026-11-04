@@ -11,8 +11,9 @@ from math import exp, hypot
 from . import economy as E
 from .calendar import parts, is_rest_day
 from .loads import bump
-from .params import (CHILD_DAY, EMIGRATION_SHARE, FAMILY_SUPPORT_DAY, HOLIDAY_PERSONS, HOUSEHOLD_SIZE, HOUSING_DAY,
+from .params import (CHILD_DAY, EMIGRATION_RATE, EMIGRATION_RATE_RETIRED, FAMILY_SUPPORT_DAY, HOLIDAY_PERSONS, HOUSEHOLD_SIZE, HOUSING_DAY,
                      IMMIGRATION_PER_YEAR, MOVE_RATE, OTHER_EXTERNAL_DAY, PENSION_DAY, POP_CAP, SECTORS, STAY_DAYS,
+                     STUDY_LEAVE_SHARE, UNEMPLOYED_EXIT,
                      TOURIST_BUDGET_DAY, UNEMPLOYMENT_DAY, VISITORS_PER_YEAR, BIRTH_RATE, DEATH_RATE, WAGE, SHIFT_HOURS,
                      INCOME_TAX, HOUSING_LOCAL_SHARE, PUBLIC_WORKS_DAY, MOVING_WEALTH)
 
@@ -260,12 +261,15 @@ def monthly(world, minute):
         deaths = min(p['count'], stochastic_round(rng, p['count']*rate/12))
         remove_people(world, p, deaths)
         demo['deaths'] += deaths
-    # Ageing: youth enter the labour force as job seekers; workers retire.
+    # Ageing: some school leavers go to the mainland, the rest enter the labour force as job seekers;
+    # workers retire.
     for z in zones:
         youth = world.pops[z['id']+'_youth']
         n = min(youth['count'], stochastic_round(rng, youth['count']/(19*12)))
-        if n:
-            E.move_people(world, youth, world.pops[f"{z['id']}_{best_sector(world, z['id'])}"], n)
+        away = min(n, stochastic_round(rng, n*STUDY_LEAVE_SHARE))
+        emigrate(world, youth, away, minute)
+        if n-away:
+            E.move_people(world, youth, world.pops[f"{z['id']}_{best_sector(world, z['id'])}"], n-away)
         retired = world.pops[z['id']+'_retired']
         for g in SECTORS:
             p = world.pops[f"{z['id']}_{g}"]
@@ -273,8 +277,18 @@ def monthly(world, minute):
             if k:
                 leave_jobs(world, p, k)
                 E.move_people(world, p, retired, k)
-    # Migration within the island and off-island.
+    # Off-island moves: life events for everyone, plus the push of unemployment and outages.
     utilities = zone_utilities(world)
+    for p in sorted(world.pops.values(), key=lambda p: p['id']):
+        if p['kind'] != 'resident' or p['group'] == 'youth' or p['count'] <= 0:
+            continue
+        outage_push = min(.01, world.zone_outage_hours(p['zone'], 90)/2500)
+        base = (EMIGRATION_RATE_RETIRED if p['group'] == 'retired' else EMIGRATION_RATE)/12
+        emigrate(world, p, stochastic_round(rng, p['count']*(base+outage_push/2)), minute)
+        if p['group'] in SECTORS:
+            unemployed = p['count']-p['employed']-p.get('inactive', 0)
+            emigrate(world, p, stochastic_round(rng, max(0, unemployed)*UNEMPLOYED_EXIT/12), minute, prefer_unemployed=True)
+    # Moves within the island, by logit over zones with free housing.
     for p in sorted(world.pops.values(), key=lambda p: p['id']):
         if p['kind'] != 'resident' or p['group'] == 'youth' or p['count'] <= 0:
             continue
@@ -286,7 +300,6 @@ def monthly(world, minute):
         if movers <= 0:
             continue
         here = utilities.get((p['zone'], p['group']), 0.)
-        options = [('off-island', EMIGRATION_SHARE*.9+here*.0)]
         weights = []
         for z in zones:
             if z['id'] == p['zone']:
@@ -298,32 +311,23 @@ def monthly(world, minute):
             weights.append((z['id'], u))
         top = max([u for _, u in weights]+[here])
         probs = [(zid, exp((u-top)/.35)) for zid, u in weights]
-        probs.append(('off-island', exp((.55-top)/.35)))
         probs.append(('stay', exp((here+.4-top)/.35)))
         total = sum(w for _, w in probs)
         for zid, w in probs:
-            k = stochastic_round(rng, movers*w/total)
-            k = min(k, p['count'])
+            k = min(p['count'], stochastic_round(rng, movers*w/total))
             if k <= 0 or zid == 'stay':
                 continue
-            if zid == 'off-island':
-                leave_jobs(world, p, k, prefer_unemployed=True)
-                share = world.ledger.balance('pop:'+p['id'])*k/p['count']
-                world.ledger.transfer('pop:'+p['id'], 'external', share, 'emigration', minute)
-                p['count'] -= k
-                demo['emigration'] += k
-            else:
-                k = min(k, int(housing_free(world, zmap[zid])*HOUSEHOLD_SIZE))
-                if k <= 0:
-                    continue
-                leave_jobs(world, p, k, prefer_unemployed=True)
-                E.move_people(world, p, world.pops[f"{zid}_{p['group']}"], k)
-                demo['internal_moves'] += k
+            k = min(k, int(housing_free(world, zmap[zid])*HOUSEHOLD_SIZE))
+            if k <= 0:
+                continue
+            leave_jobs(world, p, k, prefer_unemployed=True)
+            E.move_people(world, p, world.pops[f"{zid}_{p['group']}"], k)
+            demo['internal_moves'] += k
     # Immigration from the mainland, attracted by vacancies.
     vac = sum(max(0, f['desired_staff']-f['staff']) for f in world.firms.values() if f['status'] == 'operating')
     labour = sum(st['zone_working'].values()) or 1
     unemployment = sum(st['zone_unemployed'].values())/labour
-    inflow = stochastic_round(rng, IMMIGRATION_PER_YEAR/12*max(.2, 1+4*vac/labour-3*unemployment))
+    inflow = stochastic_round(rng, IMMIGRATION_PER_YEAR/12*min(2.5, max(.15, 1+4*vac/labour-6*max(0., unemployment-.05))))
     candidates = [(z, utilities.get((z['id'], 'services'), 0.)) for z in zones if housing_free(world, z) > 0]
     if candidates and inflow:
         top = max(u for _, u in candidates)
@@ -342,6 +346,18 @@ def monthly(world, minute):
             p['inactive'] = max(0, min(round(p['count']*.14), p['count']-p['employed']))
     refresh_stats(world)
     check_cap(world)
+
+
+def emigrate(world, p, k, minute, prefer_unemployed=False):
+    """k people of a POP leave for the mainland, taking their share of its money."""
+    k = min(k, p['count'])
+    if k <= 0:
+        return
+    leave_jobs(world, p, k, prefer_unemployed)
+    share = world.ledger.balance('pop:'+p['id'])*k/p['count']
+    world.ledger.transfer('pop:'+p['id'], 'external', share, 'emigration', minute)
+    p['count'] -= k
+    world.demography['month']['emigration'] += k
 
 
 def leave_jobs(world, p, k, prefer_unemployed=False):
