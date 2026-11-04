@@ -21,7 +21,7 @@ def r(x, n=3):
 def static(world):
     grid = world.grid
     return dict(
-        version=__version__, grid_version=grid['version'], firm_count=len(world.firms),
+        version=__version__, seed=world.seed, grid_version=grid['version'], firm_count=len(world.firms),
         island=dict(name=NAME, outline=OUTLINE, islet=ISLET, mainland=list(MAINLAND), era=ERA),
         zones=[dict(id=z['id'], name=z['name'], x=z['x'], y=z['y'], kind=z['kind'], bus=z['bus'], beds=z['beds'],
                     holiday_homes=z['holiday_homes'], amenity=z['amenity'], town=z.get('town', 0)) for z in world.zones],
@@ -70,7 +70,7 @@ def snapshot(world, since_log=0):
     return dict(
         minute=world.minute, label=label(world.minute), year=p['year'], month=MONTHS[p['month']-1], day=p['day'],
         hour=p['hour'], minute_of_hour=p['minute'], weekday=WEEKDAYS[p['weekday']], rest=is_rest_day(world.minute),
-        weather=dict(wind=r(w['wind_10m_ms'], 2), dir=r(w['direction_deg'], 0), temp=r(w['temperature_c'], 1),
+        weather=dict(wind=r(w['wind_10m_ms'], 2), ratio=r(w['wind_ratio'], 4), dir=r(w['direction_deg'], 0), temp=r(w['temperature_c'], 1),
                      cloud=r(w['cloud_fraction'], 2), sun=r(w['irradiance_w_m2'], 0), rh=r(w['humidity_pct'], 0),
                      sunrise=r(w['sunrise_hour'], 2), sunset=r(w['sunset_hour'], 2), elev=r(w['sun_elevation_deg'], 2), snow=r(W.snow_cover(world.seed, world.minute/1440), 2), thunder=r(w['thunder_risk'], 2),
                      icing=r(w['icing_risk'], 2)),
@@ -211,8 +211,9 @@ def parcel(world, x, y):
     """Everything known about the 0.5 km parcel at (x, y) (spec 9.2: land use, wind, cost of building)."""
     from . import land
     from .construction import BuildError, plan_turbine
-    from .island import coast_distance, exposure, inside
-    from math import hypot, log
+    from .island import coast_distance
+    from . import windfield as WF
+    from math import hypot
     c = land.cell_of(x, y)
     if c is None:
         return None
@@ -230,10 +231,12 @@ def parcel(world, x, y):
     people = land.parcel_people(cx, cy, residents)
     towns = sorted(world.zones, key=lambda q: hypot(q['x']-cx, q['y']-cy))
     sub = min(world.substations.values(), key=lambda s: hypot(s['x']-cx, s['y']-cy))
-    mean10 = W.COEFFICIENTS['WS10M'][0]
-    shear = log(W.COEFFICIENTS['WS50M'][0]/mean10)/log(5)
-    expo = exposure(cx, cy)+land.roughness(cx, cy)
-    now = W.hub_speed(world.weather_now, 100, cx, cy, world.minute/1440, expo)
+    now = WF.hub_speed(world.weather_now, 100, cx, cy, world.minute/1440, world.seed)
+    yields = []
+    for model, m in TURBINE_MODELS.items():
+        mean = WF.at_height(cx, cy, m['hub'])
+        cf = N.capacity_factor(model, mean)
+        yields.append(dict(model=model, hub=m['hub'], mean=r(mean, 2), cf=r(cf, 3), gwh=r(cf*m['mw']*8.76, 1)))
     objects = [t for t, tb in world.grid['turbines'].items() if land.cell_of(tb['x'], tb['y']) == c]
     objects += [s for s, x in world.substations.items() if land.cell_of(x['x'], x['y']) == c]
     try:
@@ -244,7 +247,7 @@ def parcel(world, x, y):
     out.update(zone=z['id'], zone_name=z['name'], zone_kind=z['kind'], people=round(people), coast_km=r(coast_distance(cx, cy), 2),
                nearest_town=towns[0]['name'], town_km=r(hypot(towns[0]['x']-cx, towns[0]['y']-cy), 1),
                substation=sub['name'], substation_km=r(hypot(sub['x']-cx, sub['y']-cy), 1),
-               wind_mean_100m=r(mean10*10**shear*expo, 2), wind_now_100m=r(now, 2), exposure=r(expo, 3),
+               wind_mean_100m=r(WF.mean100(cx, cy), 2), wind_now_100m=r(now, 2), yields=yields,
                objects=objects, turbine_site=build, buildable_area_km2=r(land.CELL**2 if build['ok'] else 0., 2))
     return out
 

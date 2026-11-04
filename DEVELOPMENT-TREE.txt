@@ -17,6 +17,7 @@ Powerbolaget-0.1.0/
 │   ├── events.py
 │   ├── grid.py
 │   ├── island-climatology.json
+│   ├── island-wind.json
 │   ├── island.py
 │   ├── land.py
 │   ├── ledger.py
@@ -29,6 +30,7 @@ Powerbolaget-0.1.0/
 │   ├── society.py
 │   ├── views.py
 │   ├── weather.py
+│   ├── windfield.py
 │   ├── world.py
 │   └── worldgen.py
 ├── docs/
@@ -129,7 +131,8 @@ Powerbolaget-0.1.0/
 │   ├── development_tree.py
 │   ├── license_inventory.py
 │   ├── package.py
-│   └── pixel_font.py
+│   ├── pixel_font.py
+│   └── wind_atlas.py
 ├── web/
 │   ├── js/
 │   │   ├── chart.js

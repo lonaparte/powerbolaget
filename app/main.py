@@ -234,9 +234,10 @@ def entity(payload: EntityRequest):
 
 @app.get('/api/land')
 def land_grid():
-    """The island's parcels: land use and zone of every 0.5 km cell (fixed for this version)."""
+    """The island's parcels (land use and zone of every 0.5 km cell) and its long-term mean wind field."""
     from .land import encoded
-    return encoded()
+    from .windfield import FIELD
+    return dict(encoded(), wind={k: FIELD[k] for k in ('x0', 'y0', 'cell_km', 'nx', 'ny', 'values', 'height_m', 'source')})
 
 
 @app.post('/api/parcel')

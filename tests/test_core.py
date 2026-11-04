@@ -70,3 +70,21 @@ def test_weather_follows_the_island_climate():
     assert 17.6 < midsummer['daylight_hours'] < 18.4 and 6.2 < midwinter['daylight_hours'] < 6.8
     assert W.sun(171)['elevation_deg'] > -10 > W.sun(354)['elevation_deg']   # light summer nights
     assert math.isclose(W.sun(171.5)['elevation_deg'], 90-57.5+23.44, abs_tol=.8)
+
+
+def test_wind_field_follows_the_atlas_with_smooth_variation():
+    """Mean wind at 100 m from the Global Wind Atlas; the weather and a smooth random field vary it."""
+    import statistics as S
+    from app import weather as W
+    from app import windfield as WF
+    coast, inland = WF.mean100(6.9, 21.3), WF.mean100(26.8, 66.7)    # Näsudden-like headland, Roma-like inland
+    assert coast > 8.5 and 6.8 < inland < 7.8
+    assert WF.at_height(26.8, 66.7, 80) < inland < WF.at_height(26.8, 66.7, 125)
+    days = [d/8 for d in range(8*90)]
+    var = [WF.variation(1, 30., 60., t) for t in days]
+    assert abs(S.mean(var)-1) < .02 and .02 < S.pstdev(var) < .07
+    assert max(abs(WF.variation(1, 30., 60., t)-WF.variation(1, 31., 60., t)) for t in days) < .03   # smooth in space
+    steps = [WF.variation(1, 30., 60., m/144) for m in range(144*10)]                                 # every 10 minutes
+    assert max(abs(a-b) for a, b in zip(steps, steps[1:])) < .015                                     # and in time
+    ratio = [W.instant(s, h/24)['wind_ratio'] for s in (1, 2) for h in range(0, 365*24, 6)]
+    assert .9 < S.mean(ratio) < 1.1

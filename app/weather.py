@@ -115,8 +115,12 @@ def instant(seed, time):
     cloud_noise = .4*synoptic+.82*noise(seed, time, 1)+.18*noise(seed, time, 5, 1/6)
     summer = .5-.5*cos(2*pi*(time-15)/365)
     k = WEIBULL_K[0]+WEIBULL_K[1]*cos(2*pi*(time-15)/365)
-    wind10 = max(.2, weibull_speed(normal('WS10M', time), synoptic, k)+.25*(.4+.6*summer)*sin((hour-8)*pi/12)
-                 + .15*gust+.12*turbulence)
+    calm10 = weibull_speed(normal('WS10M', time), synoptic, k)
+    wind10 = max(.2, calm10+.25*(.4+.6*summer)*sin((hour-8)*pi/12)+.15*gust+.12*turbulence)
+    # The island's anomaly at turbine height, with a long-term mean of 1: the 50 m seasonal cycle times the
+    # same synoptic and gust variation (no 10 m afternoon maximum, which fades aloft). windfield.py
+    # multiplies it with each place's observed mean.
+    ratio = normal('WS50M', time)/COEFFICIENTS['WS50M'][0]*max(.03, calm10+.15*gust+.12*turbulence)/normal('WS10M', time)
     s = sun(time)
     cloud = max(.05, min(.98, .65+.18*cloud_noise))
     # Daily cycle: coldest at sunrise, warmest about 2.5 h after solar noon; clear days swing more.
@@ -133,7 +137,7 @@ def instant(seed, time):
     # Convective storms: warm, humid, cloudy summer afternoons. Icing: near-freezing fog or drizzle.
     thunder = max(0., min(1., (temp-17)/8))*max(0., min(1., (cloud-.55)/.3))*max(0., sin((hour-11)*pi/10)) if 11 < hour < 21 else 0.
     icing = max(0., 1-abs(temp+1)/3)*max(0., (rh-88)/12)
-    return dict(wind_10m_ms=wind10, direction_deg=direction, shear=shear_exponent(time), temperature_c=temp,
+    return dict(wind_10m_ms=wind10, wind_ratio=ratio, direction_deg=direction, shear=shear_exponent(time), temperature_c=temp,
                 humidity_pct=rh, cloud_fraction=cloud, irradiance_w_m2=irradiance, density=101325/(287.05*(temp+273.15)),
                 thunder_risk=thunder, icing_risk=icing, daylight_hours=s['daylight_hours'],
                 sunrise_hour=s['sunrise_hour'], sunset_hour=s['sunset_hour'], sun_elevation_deg=s['elevation_deg'])
@@ -144,14 +148,6 @@ def snow_cover(seed, time):
     a cold spell and survives a mild afternoon, instead of following each hour's temperature."""
     mean = sum(instant(seed, time-k/4)['temperature_c'] for k in range(12))/12
     return max(0., min(1., (.5-mean)/2))
-
-
-def hub_speed(w, hub_m, x_km, y_km, time, exposure=1.):
-    """Wind at hub height and site: shear, site exposure and a slowly travelling spatial pattern."""
-    d = w['direction_deg']*pi/180
-    along = x_km*sin(d)+y_km*cos(d)
-    pattern = 1+.035*sin(2*pi*(along/23+time*24/5))+.02*sin(2*pi*((x_km-y_km)/31-time*24/9))
-    return max(0., w['wind_10m_ms']*(hub_m/10)**w['shear']*exposure*pattern)
 
 
 def forecast(seed, issued, time):

@@ -125,11 +125,6 @@ def coast_distance(x, y):
     return best
 
 
-def exposure(x, y):
-    """Wind exposure of a site: open coast is windier than the forested interior (assumption)."""
-    return 1+.07*exp(-coast_distance(x, y)/2.5)-.03*(1-exp(-coast_distance(x, y)/6))
-
-
 def zone_at(x, y, zones):
     """Economic zone of a point: the nearest zone centre on the same landmass."""
     islet = inside(x, y, ISLET)

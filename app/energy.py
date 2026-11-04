@@ -9,7 +9,7 @@ faults, overloads and voltage; a non-converged power flow is reported as a numer
 as a blackout.
 """
 from math import exp, log, radians, sin, cos, sqrt
-from .weather import hub_speed
+from .windfield import hub_speed
 from . import grid as G
 from .island import TURBINE_MODELS
 from .calendar import parts
@@ -38,6 +38,19 @@ def power_curve(model, v, density):
         return m['mw']
     frac = (v**3-m['cut_in']**3)/(m['rated_speed']**3-m['cut_in']**3)
     return m['mw']*min(1., frac*density/AIR)
+
+
+def capacity_factor(model, mean_hub, k=2.2, density=1.225):
+    """Expected share of rated output at a site with this mean hub wind, for Weibull-distributed winds
+    (shape 2.2), before wakes, outages and curtailment."""
+    from math import gamma
+    scale = mean_hub/gamma(1+1/k)
+    total, step = 0., .1
+    for i in range(1, 320):
+        v = i*step
+        pdf = k/scale*(v/scale)**(k-1)*exp(-(v/scale)**k)
+        total += power_curve(model, v, density)*pdf*step
+    return total/TURBINE_MODELS[model]['mw']
 
 
 def thrust(model, v):
@@ -94,13 +107,13 @@ def available_wind(world, t, w):
         if not ids:
             continue
         sample = grid['turbines'][ids[0]]
-        v_ref = hub(sample, w, t)
+        v_ref = hub(sample, w, t, world.seed)
         factors = wake_factors(grid, farm_id, w['direction_deg'], thrust(sample['model'], v_ref))
         for tid in ids:
             tb = grid['turbines'][tid]
             if tb['status'] == 'construction':
                 continue
-            v = hub(tb, w, t)*factors.get(tid, 1.)
+            v = hub(tb, w, t, world.seed)*factors.get(tid, 1.)
             tb['v'] = v
             if tb['status'] != 'ok' or tb['grid_wait'] > t:
                 out[tid] = 0.
@@ -114,8 +127,8 @@ def available_wind(world, t, w):
     return out
 
 
-def hub(tb, w, t):
-    return hub_speed(w, tb['hub'], tb['x'], tb['y'], t/1440, tb['exposure'])
+def hub(tb, w, t, seed):
+    return hub_speed(w, tb['hub'], tb['x'], tb['y'], t/1440, seed)
 
 
 # ---------------------------------------------------------------- dispatch

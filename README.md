@@ -36,7 +36,7 @@ The screen has three views of the same world, a context inspector on the right a
 - **Inspector**: click anything to see its current values, history and causes:
   - a turbine, line, bus, substation, battery or the mainland links;
   - a zone, a firm or a POP;
-  - a land parcel: land use, people, wind resource, distances, and whether and at what cost a turbine may be built there.
+  - a land parcel: land use, people, the long-term and current wind, the expected yield of each turbine model, distances, and whether and at what cost a turbine may be built there.
 - **Build** (island view): wind turbines (PB-2.3, PB-3.6 or PB-5.6), batteries (optionally grid-forming), 110 kV lines and transformer units. Every build shows a server-side preview of cost, construction time and electrical connection. Projects are paid monthly; if Powerbolaget runs out of cash, the shortfall is booked as external financing.
 - **Operate**: start and end turbine maintenance, open and close breakers, set battery modes and the link operating margin.
 - **Time**: the clock runs by itself. Space pauses. Speeds are 10 simulated minutes, 1 hour, 6 hours or 1 day per second, as fast as the server allows. The dock shows the island balance minute by minute for the last four hours and hour by hour for the last three days, plus events, projects (yours, firms' expansions and the grid operator's) and pinned objects.
@@ -61,7 +61,7 @@ The design is documented in `docs/MODEL.md`, mapped section by section to the v0
 - **Load Profile Engine.** Continuous minute-level P/Q from hourly plans. Plans ramp from the current value, so the top of the hour never jumps. Zone thermal models produce real cold-load pickup after an outage, and machines are discrete state machines.
 - **Energy.**
   - AC power flow every simulated minute in OpenDSS, on the full 220/110/33/20/0.69 kV network, with every turbine and its unit transformer modelled.
-  - Jensen wakes inside each wind farm.
+  - A wind field from the Global Wind Atlas with smooth random variation, and Jensen wakes inside each wind farm.
   - An automatic operator balances the island with the mainland links, then batteries, then wind curtailment, and last load shedding by priority class.
   - On-load tap changers regulate the 20 kV and 110 kV busbars.
   - Faults depend on weather, age and maintenance. Protection trips, overhead lines reclose, faulted 20 kV feeders are re-fed by switching, and repairs take time. Grid-forming batteries can carry the island when the mainland is lost.
@@ -71,7 +71,7 @@ The design is documented in `docs/MODEL.md`, mapped section by section to the v0
   - The grid operator's planned HVAC link: two 220 kV AC subsea cables to Stenkumla south of the main town, after Svenska kraftnät's Gotland connection plan (in service from 2031, which is FE 6). It starts at 150 MW on 1 Sep FE 6, reaches 300 MW with the second cable on 1 Mar FE 7, and 440 MW in FE 9.
   - With the AC link in service, the island is synchronous with the mainland and the HVDC runs on a schedule. If the AC link is lost, the HVDC converter forms the island grid again.
 
-Weather is continuous and seeded. Its seasonal means come from the NASA POWER 2001–2025 climatology at 57.5° N, 18.5° E. Wind variability, calms and the wind rose are fitted to NASA POWER hourly data at the same point, and the daily temperature range follows Visby's averages. All other numbers are assumptions, collected in `app/params.py` and marked as such. Gutnö is not a digital twin: its firms, substations, wiring and settings are invented.
+Weather is continuous and seeded: each natural quantity has an observed mean, and the game adds smooth random variation around it. Seasonal means come from the NASA POWER 2001–2025 climatology at 57.5° N, 18.5° E. Wind variability, calms and the wind rose are fitted to NASA POWER hourly data at the same point, and the daily temperature range follows Visby's averages. Each place's long-term wind at 100 m comes from the Global Wind Atlas (CC BY 4.0) on a 1 km grid, so coasts are windier than the interior. Existing turbines then produce about as much per MW as Gotland's real fleet. All other numbers are assumptions, collected in `app/params.py` and marked as such. Gutnö is not a digital twin: its firms, substations, wiring and settings are invented.
 
 Not modelled in 0.1.0:
 - electromechanical and electromagnetic transients, frequency dynamics and unbalanced faults;

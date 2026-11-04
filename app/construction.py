@@ -10,7 +10,7 @@ power flow will be feasible, which the solver checks after commissioning.
 from math import hypot
 from . import grid as G
 from . import land
-from .island import TURBINE_MODELS, exposure, inside, zone_at
+from .island import TURBINE_MODELS, inside, zone_at
 from .params import COST, DAYS, LOCAL_CONSTRUCTION_SHARE
 from .calendar import DAY
 
@@ -197,7 +197,7 @@ def add_turbine(world, plan, status='ok', project=None, tid=None, age=0.):
     G.add_transformer(grid, f'{tid}_tr', mv, lv, '33/0.69', round(m['mw']*1.12, 2), name=f'{tid.upper()} unit transformer')
     grid['turbines'][tid] = dict(id=tid, model=plan['model'], mw=m['mw'], rotor=m['rotor'], hub=m['hub'], x=x, y=y,
                                  farm=farm_id, bus_mv=mv, bus_lv=lv, status=status, age=age, maintained=world.minute,
-                                 built=world.minute if status == 'ok' else None, exposure=round(exposure(x, y)+land.roughness(x, y), 4),
+                                 built=world.minute if status == 'ok' else None,
                                  grid_wait=0., v=0., p=0., energy_mwh=0., project=project)
     grid['farms'][farm_id]['turbines'].append(tid)
     grid['version'] = grid.get('version', 0)+1

@@ -119,9 +119,12 @@ PB.inspector = (() => {
       html = head(`Parcel · ${d.size_km} × ${d.size_km} km`, d.land.toUpperCase(), null)
         + (d.zone ? kv([['Zone', link(d.zone, d.zone_name)], ['People living here (est.)', PB.int(d.people)], ['Nearest town', `${PB.esc(d.nearest_town)} · ${PB.fmt(d.town_km, 1)} km`],
           ['Distance to the sea', PB.fmt(d.coast_km, 2) + ' km'], ['Mean wind at 100 m', PB.fmt(d.wind_mean_100m, 2) + ' m/s'], ['Wind at 100 m now', PB.fmt(d.wind_now_100m, 1) + ' m/s'],
-          ['Site exposure', PB.fmt(d.exposure, 3)], ['Nearest substation', `${PB.esc(d.substation)} · ${PB.fmt(d.substation_km, 1)} km`], ['Coordinates', `${PB.fmt(d.x, 2)}, ${PB.fmt(d.y, 2)} km`]])
+          ['Nearest substation', `${PB.esc(d.substation)} · ${PB.fmt(d.substation_km, 1)} km`], ['Coordinates', `${PB.fmt(d.x, 2)}, ${PB.fmt(d.y, 2)} km`]])
           + (d.objects.length ? `<h3>ON THIS PARCEL</h3><ul class="list">${d.objects.map(o => `<li class="click" data-goto="${o}">${PB.esc(PB.name(o))}</li>`).join('')}</ul>` : '')
-          + `<h3>WIND TURBINE SITE</h3>` + (t.ok ? `<p class="small ok">Suitable for a turbine.</p>${kv([['PB-3.6 incl. connection', PB.msek(t.cost)], ['Construction time', t.days + ' days'], ['Connection', PB.esc(t.connection)]])}
+          + `<h3>WIND TURBINE SITE</h3>`
+          + `<ul class="list">${(d.yields || []).map(y => `<li>${PB.esc(y.model)} · hub ${y.hub} m<span class="small muted" style="margin-left:auto">${PB.fmt(y.mean, 1)} m/s · ${PB.pct(y.cf)} · ${PB.fmt(y.gwh, 1)} GWh/yr</span></li>`).join('')}</ul>`
+          + `<p class="small muted">Long-term mean wind from the Global Wind Atlas; expected output before wakes, outages and curtailment.</p>`
+          + (t.ok ? `<p class="small ok">Suitable for a turbine.</p>${kv([['PB-3.6 incl. connection', PB.msek(t.cost)], ['Construction time', t.days + ' days'], ['Connection', PB.esc(t.connection)]])}
               <div class="actions"><button class="button primary" data-buildhere="1">Build a turbine here…</button></div>` : `<p class="small warn">${PB.esc(t.reason)}</p>`)
           : `<p class="small muted">${PB.esc(d.note || '')}</p>`);
     } else if (d.type === 'project') {

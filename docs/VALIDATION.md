@@ -4,7 +4,7 @@ Everything below was run on 4 November 2026 on the release commit's code. The ma
 
 ## Automated tests
 
-`python -m pytest -q -p no:cacheprovider`: **25 passed** in about 11 s.
+`python -m pytest -q -p no:cacheprovider`: **26 passed** in about 16 s.
 
 | Area | Test | What it checks |
 |---|---|---|
@@ -12,6 +12,7 @@ Everything below was run on 4 November 2026 on the release commit's code. The ma
 | | `test_streams_are_independent_and_resume_exactly` | Named random streams do not disturb each other and resume bit for bit after saving. |
 | | `test_events_run_in_time_then_priority_order_and_survive_saving` | Events at sub-minute timestamps run in time order, then by priority group. Ids never repeat after reload. |
 | | `test_ledger_never_creates_money` | Every transfer has a payer and a payee, so all accounts sum to zero. |
+| | `test_wind_field_follows_the_atlas_with_smooth_variation` | The atlas mean is above 8.5 m/s on a south-western headland and 6.8–7.8 m/s inland. Wind grows with hub height. The random factor averages 1 with a 2–7 % spread, differs by less than 3 % between places 1 km apart and changes by less than 1.5 % per 10 minutes. The island anomaly averages 0.9–1.1. |
 | | `test_weather_follows_the_island_climate` | Over a simulated year: wind variability and calms within the observed range, south-west the most common direction and every direction occurring, a July daily temperature swing near Visby's, an 18-hour midsummer day and a 6.5-hour midwinter day, and light June nights. |
 | World | `test_money_people_and_jobs_balance_after_a_day` | After a full day: money sums to zero, employed people equal filled jobs per POP and per firm, the POP cap holds, no numerical failures. |
 | | `test_monthly_population_account_is_exact` | `end = start + births - deaths + immigration - emigration`. |
@@ -67,6 +68,18 @@ The targets come from NASA POWER hourly data at the model's point, 57.5° N, 18.
 
 Snow lies on about 22–28 days a year, in five to eight cold spells (seeds 1–3).
 
+### Wind at the turbines
+
+Each place's long-term mean at 100 m comes from the Global Wind Atlas, averaged over 1 km cells. The weather and a smooth random field (about ±5 %, 12 km, 3 h) vary it. Over one simulated year (seed 1, before wakes, outages and curtailment):
+
+| Farm | Atlas mean at 100 m | Mean at hub height | Capacity factor |
+|---|---|---|---|
+| Uddens vindpark (south-western headland, PB-2.3, 80 m) | 9.0 m/s | 8.5 m/s | 36.5 % |
+| Östergarns vindpark (east coast, PB-3.6, 100 m) | 7.9 m/s | 7.9 m/s | 31.8 % |
+| Nordheds vindpark (northern interior, PB-2.3, 80 m) | 7.8 m/s | 7.4 m/s | 28.3 % |
+
+For comparison, Gotland's real fleet of about 180 MW, many of them older and smaller turbines, produces about 450 GWh a year, a capacity factor of about 28 %. Before this calibration, hub winds were derived from the NASA grid cell alone (mostly sea, with little shear) and the farms reached only 20–26 %.
+
 ## Another OpenDSS finding
 
 OpenDSS `Circuit.TotalPower` adds up every voltage source. While a grid-forming battery carried the island, the mainland exchange therefore showed the battery's power. The backend now reads each voltage source's terminal power, so the mainland source and grid-forming batteries are reported separately. `test_grid_forming_battery_carries_the_island_when_the_link_is_lost` checks that the exchange is zero while islanded and that turbines plus battery balance load and losses.
@@ -98,5 +111,5 @@ The first year run found two faults in the model, both now fixed:
 - No comparison against measured Gotland load, wind output or economic statistics. Every coefficient outside the NASA POWER climatology is an assumption.
 - No dynamic (RMS or EMT) validation; the model has no dynamics.
 - Unemployment is seasonal, but it peaks in May instead of in winter. The seasonal labour pattern is not calibrated.
-- Turbine output: the existing turbines reach a capacity factor of about 19 % after wakes and outages. Free-stream hub winds average 6.5–6.9 m/s, because the NASA grid cell is mostly sea and its wind increases little between 10 m and 50 m. Real onshore turbines on Gotland probably do somewhat better; this has not been checked against production data.
+- Wind: the Global Wind Atlas is a model product, and its local error on Gotland has not been checked against mast measurements. Turbine output is compared only with the island-wide production figure.
 - Browser tests run in Chromium only.

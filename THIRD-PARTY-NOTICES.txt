@@ -36,6 +36,12 @@ are fitted to NASA POWER hourly data (WS10M, WD10M, T2M, 2020-2024) at the same
 point; the daily temperature range follows Visby station averages published at
 https://www.weatherandclimate.eu/climate/02590. Only summary statistics are
 stored, in app/weather.py.
+
+Island wind field: Global Wind Atlas, mean wind speed at 100 m (country GeoTIFF
+for Sweden), averaged over 1 km cells by tools/wind_atlas.py and stored in
+app/island-wind.json. Licensed CC BY 4.0. The Global Wind Atlas is developed by
+DTU Wind Energy in partnership with the World Bank Group, with funding from
+ESMAP. https://globalwindatlas.info
 The stored monthly values calibrate continuous seasonal functions; the game
 generates synthetic weather using smooth seeded disturbances.
 https://power.larc.nasa.gov/docs/services/api/temporal/climatology/

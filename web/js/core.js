@@ -129,6 +129,37 @@ PB.setTheme = mode => {
   try { localStorage.setItem('pb-theme-mode', mode); } catch {}
   PB.theme();
 };
+// ---------------------------------------------------------------- wind field (same functions as app/windfield.py)
+// The wind at a place = its long-term mean at 100 m (Global Wind Atlas) x the island's current anomaly x a
+// smooth random variation that changes over about 12 km and 3 hours.
+{
+  const hash = (ix, iy, iz, seed) => {
+    let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(iz, 1274126177) + Math.imul(seed, 2246822519)) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h / 4294967296 * 2 - 1;
+  };
+  const smooth = f => f * f * f * (10 + f * (-15 + 6 * f));
+  PB.windNoise = (seed, x, y, z) => {
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = smooth(x - ix), fy = smooth(y - iy), fz = smooth(z - iz);
+    let total = 0;
+    for (const [dz, wz] of [[0, 1 - fz], [1, fz]]) for (const [dy, wy] of [[0, 1 - fy], [1, fy]]) for (const [dx, wx] of [[0, 1 - fx], [1, fx]])
+      total += wx * wy * wz * hash(ix + dx, iy + dy, iz + dz, seed);
+    return total;
+  };
+  PB.windMean = (x, y) => {
+    const f = PB.land && PB.land.wind; if (!f) return 0;
+    const gx = Math.min(Math.max((x - f.x0) / f.cell_km - .5, 0), f.nx - 1.0001), gy = Math.min(Math.max((y - f.y0) / f.cell_km - .5, 0), f.ny - 1.0001);
+    const i = Math.floor(gx), j = Math.floor(gy), fx = gx - i, fy = gy - j, k = j * f.nx + i, v = f.values;
+    return (v[k] * (1 - fx) + v[k + 1] * fx) * (1 - fy) + (v[k + f.nx] * (1 - fx) + v[k + f.nx + 1] * fx) * fy;
+  };
+  // Speed at 100 m (m/s) and the direction it blows from (degrees) at a place, now.
+  PB.windAt = (x, y) => {
+    const s = PB.snap, seed = PB.static ? PB.static.seed : 0, t = s.minute / 1440;
+    const speed = PB.windMean(x, y) * (s.weather.ratio ?? 1) * (1 + .09 * PB.windNoise(seed, x / 12, y / 12, t * 8));
+    return [Math.max(0, speed), s.weather.dir + 12 * PB.windNoise(seed + 101, x / 20, y / 20, t * 4)];
+  };
+}
 PB.css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 // Pins are kept per browser.

@@ -226,18 +226,16 @@ PB.map = (() => {
       R(px, py, 1, 1, k % 5 ? '#ffd27a' : '#fff1c2');
     }
   }
-  // Surface wind for display: open sea and shore are windier, forest and towns slow it down.
-  const WIND_SURFACE = {'~': 1.15, b: 1.1, a: 1, f: 1, w: 1, q: .95, r: .95, v: .88, F: .82, T: .75};
+  // The wind field at 100 m (PB.windAt): arrows sit on a grid fixed in km, so they pan and zoom with the
+  // map, and the grid coarsens as you zoom out. Arrow length follows the local speed.
   function drawWind(s) {
-    // Arrows sit on a grid fixed in km, so they pan and zoom with the map; the grid coarsens as you zoom out.
     let km = .5; while (km * view.z < 16) km *= 2;
-    const dir = (s.weather.dir + 180) * Math.PI / 180, ux = Math.sin(dir), uy = Math.cos(dir);   // blowing towards, km axes (north up)
-    const drift = ((frame * s.weather.wind * .0025) % 1) * km;
+    const d0 = (s.weather.dir + 180) * Math.PI / 180, drift = ((frame * s.weather.wind * .0025) % 1) * km;
     const [xa, ya] = toKm(0, H), [xb, yb] = toKm(W, 0), bright = PB.light() > .5;
     for (let gy = Math.floor(ya / km - 1) * km; gy <= yb + km; gy += km) for (let gx = Math.floor(xa / km - 1) * km; gx <= xb + km; gx += km) {
-      const x = gx + ux * drift, y = gy + uy * drift, k = cellAt(x, y), cls = k < 0 ? '~' : PB.land.classes[k], surface = WIND_SURFACE[cls] ?? 1;
-      const gust = .85 + .3 * noise(x * .15 + frame * .004, y * .15);
-      const len = Math.min(km * view.z * .8, (2 + s.weather.wind * .9) * surface * gust);
+      const x = gx + Math.sin(d0) * drift, y = gy + Math.cos(d0) * drift, k = cellAt(x, y), cls = k < 0 ? '~' : PB.land.classes[k];
+      const [speed, from] = PB.windAt(x, y), d = (from + 180) * Math.PI / 180, ux = Math.sin(d), uy = Math.cos(d);
+      const len = Math.min(km * view.z * .8, 1 + speed * .8);
       const [px, py] = toPx(x, y), ex = px + ux * len, ey = py - uy * len;
       if (bright && cls !== '~') {   // light land (and snow) in daylight: dark arrows
         L(px, py, ex, ey, 'rgba(30,44,70,.6)');
@@ -538,7 +536,9 @@ PB.map = (() => {
           + `<div class="small muted">White dots: active power flow. Dashed red: open or tripped. Grey: de-energised.</div>`;
       } else {
         const f = FILL_LAYERS.filter(k => layers.island[k]);
-        el.innerHTML = f.length ? `<div class="small">${f.map(k => LAYER_NAMES[k]).join(' · ')} shading by zone${layers.island.outages ? '; red stripes: zones losing supply' : ''}.</div><div class="small muted">Drag to pan, wheel to zoom, double-click to fit.</div>` : '<div class="small muted">Drag to pan, wheel to zoom, double-click to fit.</div>';
+        el.innerHTML = (f.length ? `<div class="small">${f.map(k => LAYER_NAMES[k]).join(' · ')} shading by zone${layers.island.outages ? '; red stripes: zones losing supply' : ''}.</div>` : '')
+          + (layers.island.wind ? '<div class="small">Wind at 100 m: longer arrows blow harder. Long-term means from the Global Wind Atlas, varied by the weather.</div>' : '')
+          + '<div class="small muted">Drag to pan, wheel to zoom, double-click to fit.</div>';
       }
     },
   };

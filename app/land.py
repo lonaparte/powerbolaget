@@ -1,7 +1,7 @@
 """Land: the island as 0.5 km parcels with land use, zone membership and people (spec 9.2).
 
 Land use is world data, not decoration: the map draws it, turbine siting obeys it (no turbines in
-towns, villages, quarries, nature reserves or on the shore) and wind roughness depends on it. It is
+towns, villages, quarries, nature reserves or on the shore) and the wind shear above it depends on it. It is
 derived deterministically from the island outline, the zones' towns and fixed site lists, so every
 server and every save sees the same land.
 """
@@ -18,7 +18,6 @@ CLASSES = {
 }
 NO_TURBINES = {'~': 'at sea', 'b': 'on the shore', 'T': 'in a town', 'v': 'among homes', 'q': 'in an active quarry',
                'r': 'in a nature reserve'}
-ROUGHNESS = {'F': -.04, 'T': -.06, 'v': -.02, 'a': .01, 'b': .02, 'w': .0, 'f': .0, 'q': .0, 'r': .0}
 QUARRIES = [(46.2, 90.6, .9), (17.4, 17.2, .6), (34.0, 80.0, .4)]
 RESERVES = [(74.0, 117.0, 2.8), (8.6, 4.2, 1.4), (31.5, 50.0, 2.2), (36.5, 100.0, 1.8), (57.5, 60.5, .9)]
 
@@ -116,10 +115,6 @@ def land_class(x, y):
     if c is None:
         return '~'
     return grid()[0][c[1]*NX+c[0]]
-
-
-def roughness(x, y):
-    return ROUGHNESS.get(land_class(x, y), 0.)
 
 
 def homes_within(x, y, km):
