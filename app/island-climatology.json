@@ -1,0 +1,110 @@
+{
+ "source": "NASA POWER Climatology API, community RE",
+ "retrieved": "2026-11-04",
+ "url": "https://power.larc.nasa.gov/api/temporal/climatology/point?parameters=WS10M,WS50M,T2M,ALLSKY_SFC_SW_DWN,RH2M&community=RE&longitude=18.5&latitude=57.5&format=JSON",
+ "point": {
+  "latitude": 57.5,
+  "longitude": 18.5,
+  "elevation_m": 6.74
+ },
+ "period": "25-year Meteorological and Solar Monthly & Annual Climatologies (January 2001 - December 2025)",
+ "units": {
+  "ALLSKY_SFC_SW_DWN": {
+   "units": "kW-hr/m^2/day",
+   "longname": "All Sky Surface Shortwave Downward Irradiance"
+  },
+  "RH2M": {
+   "units": "%",
+   "longname": "Relative Humidity at 2 Meters"
+  },
+  "T2M": {
+   "units": "C",
+   "longname": "Temperature at 2 Meters"
+  },
+  "WS10M": {
+   "units": "m/s",
+   "longname": "Wind Speed at 10 Meters"
+  },
+  "WS50M": {
+   "units": "m/s",
+   "longname": "Wind Speed at 50 Meters"
+  }
+ },
+ "parameter": {
+  "ALLSKY_SFC_SW_DWN": {
+   "JAN": 0.3586,
+   "FEB": 0.9562,
+   "MAR": 2.3887,
+   "APR": 4.3195,
+   "MAY": 5.7869,
+   "JUN": 6.3029,
+   "JUL": 5.7888,
+   "AUG": 4.5586,
+   "SEP": 2.9765,
+   "OCT": 1.3505,
+   "NOV": 0.4776,
+   "DEC": 0.2381,
+   "ANN": 2.9676
+  },
+  "RH2M": {
+   "JAN": 87.55,
+   "FEB": 87.38,
+   "MAR": 84.99,
+   "APR": 82.96,
+   "MAY": 81.57,
+   "JUN": 78.98,
+   "JUL": 79.4,
+   "AUG": 79.31,
+   "SEP": 81.74,
+   "OCT": 84.76,
+   "NOV": 88.63,
+   "DEC": 88.46,
+   "ANN": 83.79
+  },
+  "T2M": {
+   "JAN": 1.11,
+   "FEB": 0.62,
+   "MAR": 1.75,
+   "APR": 4.82,
+   "MAY": 9.42,
+   "JUN": 14.27,
+   "JUL": 17.91,
+   "AUG": 18.03,
+   "SEP": 14.48,
+   "OCT": 9.56,
+   "NOV": 5.84,
+   "DEC": 2.94,
+   "ANN": 8.44
+  },
+  "WS10M": {
+   "JAN": 6.03,
+   "FEB": 5.5,
+   "MAR": 4.83,
+   "APR": 4.02,
+   "MAY": 3.55,
+   "JUN": 3.78,
+   "JUL": 3.83,
+   "AUG": 4.26,
+   "SEP": 5.0,
+   "OCT": 5.55,
+   "NOV": 5.62,
+   "DEC": 6.04,
+   "ANN": 4.83
+  },
+  "WS50M": {
+   "JAN": 7.46,
+   "FEB": 6.9,
+   "MAR": 6.37,
+   "APR": 5.69,
+   "MAY": 5.22,
+   "JUN": 5.4,
+   "JUL": 5.18,
+   "AUG": 5.49,
+   "SEP": 6.35,
+   "OCT": 6.97,
+   "NOV": 7.01,
+   "DEC": 7.5,
+   "ANN": 6.29
+  }
+ }
+}

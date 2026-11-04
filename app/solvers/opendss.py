@@ -1,6 +1,7 @@
 """OpenDSS backend (OpenDSSDirect.py): the only module that imports the OpenDSS library."""
+import math
 from opendssdirect import dss
-from .model import GridModel, Line, Load, Generator, SolverError, Transformer
+from .model import GridFormer, GridModel, Line, Load, Generator, Results, SolverError, Transformer
 
 NAME = 'OpenDSSDirect.py'
 
@@ -17,6 +18,9 @@ class Backend:
         commands += [f"set voltagebases=[{' '.join(str(v) for v in model.voltage_bases_kv)}]", 'calcvoltagebases',
                      'set mode=snapshot controlmode=off maxiterations=100 tolerance=.000001']
         self.d('\n'.join(commands))
+        for e in model.elements:
+            if isinstance(e, Line) and not e.closed:
+                self.set_enabled('line', e.name, False)
 
     @staticmethod
     def _command(e):
@@ -25,16 +29,25 @@ class Backend:
                     f'kvs=[{e.hv_kv} {e.lv_kv}] kvas=[{e.kva} {e.kva}] xhl={e.x_pct} %loadloss={e.load_loss_pct} %noloadloss={e.no_load_loss_pct}')
         if isinstance(e, Line):
             return (f'new line.{e.name} bus1={e.bus1} bus2={e.bus2} phases=3 length={e.length_km} units=km r1={e.r1} x1={e.x1} '
-                    f"r0={e.r0} x0={e.x0} c1={e.c1_nf} c0={e.c0_nf} normamps={e.amps}{'' if e.closed else ' enabled=no'}")
+                    f"r0={e.r0} x0={e.x0} c1={e.c1_nf} c0={e.c0_nf} normamps={e.amps}")
         if isinstance(e, Load):
             limits = '' if e.vmin_pu is None else f' vminpu={e.vmin_pu} vmaxpu={e.vmax_pu}'
             return f'new load.{e.name} bus1={e.bus} phases=3 kv={e.kv} kw={e.kw} pf={e.pf} model=1{limits}'
+        if isinstance(e, GridFormer):
+            return f'new vsource.{e.name} bus1={e.bus} phases=3 basekv={e.kv} pu={e.pu} mvasc3={e.mvasc} mvasc1={e.mvasc} enabled=no'
         if isinstance(e, Generator):
             return f'new generator.{e.name} bus1={e.bus} phases=3 kv={e.kv} kw=0 kvar=0 kva={e.kva} model=1 vminpu={e.vmin_pu} vmaxpu={e.vmax_pu}'
         raise TypeError(f'Unsupported network element {e!r}')
 
     def set_enabled(self, kind, name, enabled):
-        self.d(f"edit {kind}.{name} enabled={'yes' if enabled else 'no'}")
+        # Lines and transformers are switched by opening both terminals. Disabling them instead leaves
+        # buses without any admittance to ground, and OpenDSS then reports a converged but meaningless
+        # solution.
+        if kind in ('line', 'transformer'):
+            verb = 'close' if enabled else 'open'
+            self.d(f'{verb} {kind}.{name} term=1\n{verb} {kind}.{name} term=2')
+        else:
+            self.d(f"edit {kind}.{name} enabled={'yes' if enabled else 'no'}")
 
     def set_generator(self, name, kw=None, kvar=None):
         self.d.Generators.Name(name)
@@ -45,6 +58,51 @@ class Backend:
         self.d.Loads.Name(name)
         self.d.Loads.kW(kw)
         self.d.Loads.PF(pf)
+
+    def set_tap(self, name, tap):
+        self.d.Transformers.Name(name)
+        self.d.Transformers.Wdg(2)
+        self.d.Transformers.Tap(tap)
+
+    def set_powers(self, loads, generators):
+        d = self.d
+        for name, (kw, kvar) in loads.items():
+            d.Loads.Name(name); d.Loads.kW(kw); d.Loads.kvar(kvar)
+        for name, (kw, kvar) in generators.items():
+            d.Generators.Name(name); d.Generators.kW(kw); d.Generators.kvar(kvar)
+
+    def results(self):
+        d = self.d
+        nodes, mags, volts = d.Circuit.AllNodeNames(), d.Circuit.AllBusMagPu(), d.Circuit.AllBusVolts()
+        vm, va = {}, {}
+        for i, node in enumerate(nodes):
+            bus, _, phase = node.partition('.')
+            if phase == '1':
+                re, im = volts[2*i], volts[2*i+1]
+                vm[bus] = mags[i]
+                va[bus] = math.degrees(math.atan2(im, re))
+        names, powers, currents = d.PDElements.AllNames(), d.PDElements.AllPowers(), d.PDElements.AllMaxCurrents()
+        terminals, conductors = d.PDElements.AllNumTerminals(), d.PDElements.AllNumConductors()
+        branches, k = {}, 0
+        for name, nt, nc, imax in zip(names, terminals, conductors, currents):
+            sums = []
+            for _ in range(nt):
+                sums.append((sum(powers[k+2*j] for j in range(nc))/1000, sum(powers[k+2*j+1] for j in range(nc))/1000))
+                k += 2*nc
+            kind, _, short = name.partition('.')
+            if kind.lower() in ('line', 'transformer'):
+                (p1, q1), (p2, q2) = sums[0], sums[-1]
+                branches[short.lower()] = (p1, q1, p2, q2, imax)
+        formers = {}
+        for name in d.Vsources.AllNames():
+            if name != 'source':
+                d.Circuit.SetActiveElement('vsource.'+name)
+                if d.CktElement.Enabled():
+                    pw = d.CktElement.Powers()
+                    formers[name] = (-sum(pw[0:6:2])/1000, -sum(pw[1:6:2])/1000)
+        p, q = d.Circuit.TotalPower()
+        return Results(bool(d.Solution.Converged()), d.Solution.Iterations(), vm, va, branches, -p/1000, -q/1000,
+                       d.Circuit.Losses()[0]/1e6, formers)
 
     def solve(self):
         self.d.Solution.Solve()

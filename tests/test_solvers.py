@@ -48,3 +48,25 @@ def test_backend_honours_the_solver_contract(name):
     assert solver.solve() and solver.bus_voltage_pu('load') < voltage
     current, fault_voltage = create_solver(feeder(), name).short_circuit('load', .01)
     assert current > 1000 and fault_voltage < .1
+
+
+@pytest.mark.parametrize('name', sorted(BACKENDS))
+def test_opening_a_branch_leaves_a_sane_solution(name):
+    """Opening the only branch to a bus must not corrupt the rest of the solution (OpenDSS returns a
+    'converged' solution with absurd losses if the branch is disabled instead of switched open)."""
+    model = GridModel(Source('test', 'source', 10, 1.0, 100, 100),
+                      [Line('a', 'source', 'mid', 1, .1, .1, .3, .3, 10, 5, 300), Line('b', 'mid', 'end', 1, .1, .1, .3, .3, 10, 5, 300),
+                       Load('l_mid', 'mid', 10, 500, 1.0), Load('l_end', 'end', 10, 500, 1.0)], (10,))
+    solver = create_solver(model, name)
+    solver.set_powers({'l_mid': (500, 0), 'l_end': (500, 0)}, {})
+    assert solver.solve()
+    before = solver.results()
+    solver.set_enabled('line', 'b', False)
+    solver.set_powers({'l_mid': (500, 0), 'l_end': (0, 0)}, {})
+    assert solver.solve()
+    after = solver.results()
+    assert 0 <= after.losses_mw < before.losses_mw < .1
+    assert after.source_p_mw == pytest.approx(.5+after.losses_mw, abs=1e-3)
+    solver.set_enabled('line', 'b', True)
+    solver.set_powers({'l_mid': (500, 0), 'l_end': (500, 0)}, {})
+    assert solver.solve() and solver.results().source_p_mw == pytest.approx(before.source_p_mw, abs=1e-6)
