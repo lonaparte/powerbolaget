@@ -93,15 +93,20 @@ class Backend:
             if kind.lower() in ('line', 'transformer'):
                 (p1, q1), (p2, q2) = sums[0], sums[-1]
                 branches[short.lower()] = (p1, q1, p2, q2, imax)
-        formers = {}
+        # Circuit.TotalPower sums every voltage source, so read each one: the mainland source and the
+        # grid-forming batteries are reported separately.
+        formers, main = {}, (0., 0.)
         for name in d.Vsources.AllNames():
-            if name != 'source':
-                d.Circuit.SetActiveElement('vsource.'+name)
-                if d.CktElement.Enabled():
-                    pw = d.CktElement.Powers()
-                    formers[name] = (-sum(pw[0:6:2])/1000, -sum(pw[1:6:2])/1000)
-        p, q = d.Circuit.TotalPower()
-        return Results(bool(d.Solution.Converged()), d.Solution.Iterations(), vm, va, branches, -p/1000, -q/1000,
+            d.Circuit.SetActiveElement('vsource.'+name)
+            if not d.CktElement.Enabled():
+                continue
+            pw = d.CktElement.Powers()
+            pq = (-sum(pw[0:6:2])/1000, -sum(pw[1:6:2])/1000)
+            if name == 'source':
+                main = pq
+            else:
+                formers[name] = pq
+        return Results(bool(d.Solution.Converged()), d.Solution.Iterations(), vm, va, branches, main[0], main[1],
                        d.Circuit.Losses()[0]/1e6, formers)
 
     def solve(self):

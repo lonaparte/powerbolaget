@@ -137,9 +137,13 @@ def test_grid_forming_battery_carries_the_island_when_the_link_is_lost():
     for pole in ('pole1', 'pole2'):
         w.events.push(w.minute+.1, 'fault', 'protection', target='pole', id=pole)
     w.advance(3)
-    s = w.grid['storage'][sid]
+    s, f = w.grid['storage'][sid], w.flows
     assert s['forming_active'] and 'z01' in w.network.energized
-    assert s['p'] > 1 and s['soc'] < .9
+    # The battery is the island's slack: it discharges to cover a deficit or absorbs surplus wind.
+    load = sum(p*share for p, share in f['dev'].values())
+    assert abs(f['link']) < .05
+    assert sum(f['turb'].values())+f['storage'][sid] == pytest.approx(load+f['losses'], abs=.05)
+    assert abs(s['p']) > .5 and s['soc'] != .9
     served = sum(d['served'] for d in w.devices.values())/len(w.devices)
     assert served > .3
 

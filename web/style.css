@@ -9,6 +9,7 @@
  --danger:#b3463a;--danger-hi:#d6675a;--danger-lo:#64201a;--danger-ink:#fff2ec;
  --input:#0d1229;--chip:#2a2410;--chip-ink:#f2c55c;--warn-bg:#2e2410;--warn-ink:#f2c55c;--trip-bg:#3a1a1c;--trip-ink:#ff8a7a;--ok-bg:#12302c;--ok-ink:#7fe0c8;
  --map-ink:#f4ecd6;--map-halo:#0a0f22}
+html.theme-fade,html.theme-fade *{transition:background-color .9s ease,color .9s ease,border-color .9s ease,box-shadow .9s ease!important}
 html[data-theme=day]{color-scheme:light;
  --bg:#e8ddc3;--panel:#f8f0dc;--panel-2:#efe4c9;--raise:#f4e8cc;--edge:#3b2b22;--hi:#fffaf0;--lo:#cdbb93;--shadow:rgba(59,43,34,.28);
  --ink:#33261f;--muted:#786756;--faint:#a4927a;--line:#ddceab;--accent:#c4572f;

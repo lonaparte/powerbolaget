@@ -38,6 +38,15 @@ The game starts on 1 January, year 1 of the **Fantasy Era** (幻想纪元). The 
   - turbine siting obeys it (no turbines in towns, villages, quarries, reserves or on the shore, and at least 500 m from homes);
   - wind roughness depends on it;
   - parcel population estimates spread each zone's residents by settlement weight.
+- **Weather** (`app/weather.py`). Weather is continuous and seeded; no historical day is replayed.
+  - Seasonal means of wind at 10 m and 50 m, temperature, humidity and solar radiation come from the NASA POWER 2001–2025 monthly climatology at 57.5° N, 18.5° E.
+  - The spread and persistence of the anomalies were fitted to NASA POWER hourly data at the same point (2020–2024):
+    - wind speeds are Weibull-distributed with shape about 2.9 in winter and 2.3 in summer, so calms below 2 m/s occur in about 8 % of hours;
+    - wind anomalies lose about half their correlation in 12 hours;
+    - directions follow the observed wind rose: south-west 25 %, west 17 %, south 15 %, and every other direction 8–10 %.
+  - Temperature has a daily cycle from a minimum at sunrise to a maximum about 2.5 hours after solar noon. Its size follows Visby's mean daily range: about 4 °C in winter and 8–9.5 °C from April to August, larger on clear days.
+  - The sun's position is computed for the island's latitude, including atmospheric refraction. Days last about 6.5 hours at midwinter and 18 hours at midsummer. In June the sun stays within 10° below the horizon, so nights stay light.
+  - Snow lies when the mean temperature of the past three days is below about −0.5 °C.
 - **Mainland boundary.** Goods trade at mainland reference prices plus or minus freight. Visitors and immigrants come from the mainland. Electricity flows over the links at a reference price (`World.energy_price`).
 
 ## 2. Architecture and ownership
@@ -188,7 +197,7 @@ Three views (island, grid, economy), map layers, a context inspector, parcel det
   - projects, the event queue, partial-hour accumulators and every random stream's state.
 
   Saves live in the player's browser and are validated on load. Continuing a loaded save matches an uninterrupted run within floating-point tolerance: the power-flow engine restarts from a flat start, about 1e-7 relative (`tests/test_world.py`).
-- **10.4 Data.** Climate comes from NASA POWER 2001–2025 at 57.5° N, 18.5° E (`app/island-climatology.json`, with its source and period). Everything else is synthetic. No real facility coordinates, topology or protection settings are reproduced.
+- **10.4 Data.** Climate comes from NASA POWER 2001–2025 at 57.5° N, 18.5° E (`app/island-climatology.json`, with its source and period), plus summary statistics fitted to NASA POWER hourly data (2020–2024) and Visby's mean daily temperature range (`app/weather.py`). Everything else is synthetic. No real facility coordinates, topology or protection settings are reproduced.
 
 ## 12. Open questions carried forward
 

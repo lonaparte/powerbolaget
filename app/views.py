@@ -72,7 +72,7 @@ def snapshot(world, since_log=0):
         hour=p['hour'], minute_of_hour=p['minute'], weekday=WEEKDAYS[p['weekday']], rest=is_rest_day(world.minute),
         weather=dict(wind=r(w['wind_10m_ms'], 2), dir=r(w['direction_deg'], 0), temp=r(w['temperature_c'], 1),
                      cloud=r(w['cloud_fraction'], 2), sun=r(w['irradiance_w_m2'], 0), rh=r(w['humidity_pct'], 0),
-                     sunrise=r(w['sunrise_hour'], 2), sunset=r(w['sunset_hour'], 2), thunder=r(w['thunder_risk'], 2),
+                     sunrise=r(w['sunrise_hour'], 2), sunset=r(w['sunset_hour'], 2), elev=r(w['sun_elevation_deg'], 2), snow=r(W.snow_cover(world.seed, world.minute/1440), 2), thunder=r(w['thunder_risk'], 2),
                      icing=r(w['icing_risk'], 2)),
         totals=dict(load=r(load), requested=r(req), unserved=r(req-load), wind=r(wind), wind_avail=r(f.get('wind_avail', wind)),
                     link=r(f.get('link', 0.)), link_cap=r(N.link_capacity(world), 1), link_dc=r(f.get('link_dc', f.get('link', 0.))),

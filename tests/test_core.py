@@ -46,3 +46,27 @@ def test_ledger_never_creates_money():
         led.transfer(rng.choice('abcd'), rng.choice('abcd'), rng.uniform(-50, 50), 'test')
     assert abs(sum(led.accounts.values())) < 1e-9
     assert Ledger(led.state()).accounts == led.accounts
+
+
+def test_weather_follows_the_island_climate():
+    """Targets from NASA POWER hourly data at 57.5 N, 18.5 E (2020-2024) and the Visby station averages."""
+    import math
+    import statistics as S
+    from app import weather as W
+    hours = [W.instant(1, h/24) for h in range(0, 365*24, 2)]
+    wind = [w['wind_10m_ms'] for w in hours]
+    cv = S.pstdev(wind)/S.mean(wind)
+    assert .38 < cv < .52                                   # observed 0.45
+    assert .03 < sum(v < 2 for v in wind)/len(wind) < .14   # calms, observed 8 %
+    sectors = [0]*8
+    for w in hours:
+        sectors[int(((w['direction_deg']+22.5) % 360)//45)] += 1
+    share = [n/len(hours) for n in sectors]
+    assert max(share) == share[5] and min(share) > .04       # south-west prevails, every direction occurs
+    july = [W.instant(1, 181+d+h/24)['temperature_c'] for d in range(31) for h in range(24)]
+    swing = S.mean(max(july[i:i+24])-min(july[i:i+24]) for i in range(0, len(july), 24))
+    assert 6.5 < swing < 10.5                                # Visby: 8.2 C
+    midsummer, midwinter = W.sun(171), W.sun(354)
+    assert 17.6 < midsummer['daylight_hours'] < 18.4 and 6.2 < midwinter['daylight_hours'] < 6.8
+    assert W.sun(171)['elevation_deg'] > -10 > W.sun(354)['elevation_deg']   # light summer nights
+    assert math.isclose(W.sun(171.5)['elevation_deg'], 90-57.5+23.44, abs_tol=.8)

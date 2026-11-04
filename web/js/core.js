@@ -93,16 +93,35 @@ PB.apply = snap => {
 
 // ---------------------------------------------------------------- theme: day by default; night, or a day/night cycle that follows the simulated sun
 PB.themeMode = (() => { try { const m = localStorage.getItem('pb-theme-mode'); return ['day', 'night', 'auto'].includes(m) ? m : 'day'; } catch { return 'day'; } })();
+// Daylight from the sun's elevation at the island: full night below -12 degrees, full day above +3.
+// Twilight therefore lasts long in the Nordic summer (in June the sun never sinks below -10 degrees,
+// so nights stay dim rather than dark) and is short in midwinter.
 PB.daylight = () => {
   const s = PB.snap; if (!s) return 0;
-  const h = s.hour + s.minute_of_hour / 60, rise = s.weather.sunrise ?? 7, set = s.weather.sunset ?? 17;
-  return PB.clamp((h - rise + .5) / 1) * PB.clamp((set + .5 - h) / 1);
+  const e = s.weather.elev;
+  if (e == null) { const h = s.hour + s.minute_of_hour / 60; return PB.clamp((h - s.weather.sunrise + .5) / 1) * PB.clamp((s.weather.sunset + .5 - h) / 1); }
+  const t = PB.clamp((e + 12) / 15);
+  return t * t * (3 - 2 * t);
 };
-// Light level the map is drawn with: full day, full night, or the simulated sun.
-PB.light = () => PB.themeMode === 'auto' ? PB.daylight() : PB.themeMode === 'day' ? 1 : 0;
+// Light level the map is drawn with: full day, full night, or the simulated sun. The shown level eases
+// towards the target (time constant 0.5 s), so neither the sun between ticks nor a theme switch jumps.
+PB.lightTarget = () => PB.themeMode === 'auto' ? PB.daylight() : PB.themeMode === 'day' ? 1 : 0;
+{
+  let shown = null, last = 0;
+  PB.light = () => {
+    const target = PB.lightTarget(), now = performance.now();
+    shown = shown == null ? target : shown + (target - shown) * (1 - Math.exp(-(now - last) / 500));
+    last = now;
+    return shown;
+  };
+}
+let themeFade = 0;
 PB.theme = () => {
-  const name = PB.themeMode === 'auto' ? (PB.daylight() >= .5 ? 'day' : 'night') : PB.themeMode;
-  if (document.documentElement.dataset.theme !== name) { document.documentElement.dataset.theme = name; PB.emit('theme', name); }
+  const name = PB.themeMode === 'auto' ? (PB.daylight() >= .5 ? 'day' : 'night') : PB.themeMode, root = document.documentElement;
+  if (root.dataset.theme !== name) {
+    root.classList.add('theme-fade'); clearTimeout(themeFade); themeFade = setTimeout(() => root.classList.remove('theme-fade'), 1000);
+    root.dataset.theme = name; PB.emit('theme', name);
+  }
   document.querySelectorAll('[data-theme-mode]').forEach(b => b.classList.toggle('on', b.dataset.themeMode === PB.themeMode));
 };
 PB.setTheme = mode => {

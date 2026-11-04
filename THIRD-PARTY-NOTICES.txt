@@ -31,7 +31,11 @@ Island climate calibration:
 NASA POWER Climatology API (community RE), 2001-2025 gridded monthly
 climatology at 57.5 N, 18.5 E. Parameters WS10M, WS50M, T2M,
 ALLSKY_SFC_SW_DWN, RH2M. Source, period and retrieval date are stored in
-app/island-climatology.json.
+app/island-climatology.json. Wind variability, persistence and the wind rose
+are fitted to NASA POWER hourly data (WS10M, WD10M, T2M, 2020-2024) at the same
+point; the daily temperature range follows Visby station averages published at
+https://www.weatherandclimate.eu/climate/02590. Only summary statistics are
+stored, in app/weather.py.
 The stored monthly values calibrate continuous seasonal functions; the game
 generates synthetic weather using smooth seeded disturbances.
 https://power.larc.nasa.gov/docs/services/api/temporal/climatology/

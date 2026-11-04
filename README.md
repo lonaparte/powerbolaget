@@ -41,7 +41,7 @@ The screen has three views of the same world, a context inspector on the right a
 - **Operate**: start and end turbine maintenance, open and close breakers, set battery modes and the link operating margin.
 - **Time**: the clock runs by itself. Space pauses. Speeds are 10 simulated minutes, 1 hour, 6 hours or 1 day per second, as fast as the server allows. The dock shows the island balance minute by minute for the last four hours and hour by hour for the last three days, plus events, projects (yours, firms' expansions and the grid operator's) and pinned objects.
 
-The interface has a day and a night palette. It starts in **Day**; the three buttons at the top right switch between Day, Night and a day/night cycle that follows the simulated sun.
+The interface has a day and a night palette. It starts in **Day**; the three buttons at the top right switch between Day, Night and a day/night cycle. The cycle follows the sun at the island's latitude: short winter days, long summer evenings and light June nights, with dusk and dawn fading gradually.
 
 ## What is simulated
 
@@ -71,7 +71,7 @@ The design is documented in `docs/MODEL.md`, mapped section by section to the v0
   - The grid operator's planned HVAC link: two 220 kV AC subsea cables to Stenkumla south of the main town, after Svenska kraftnät's Gotland connection plan (in service from 2031, which is FE 6). It starts at 150 MW on 1 Sep FE 6, reaches 300 MW with the second cable on 1 Mar FE 7, and 440 MW in FE 9.
   - With the AC link in service, the island is synchronous with the mainland and the HVDC runs on a schedule. If the AC link is lost, the HVDC converter forms the island grid again.
 
-Weather is continuous and seeded, and calibrated with the NASA POWER 2001–2025 climatology at 57.5° N, 18.5° E. All other numbers are assumptions, collected in `app/params.py` and marked as such. Gutnö is not a digital twin: its firms, substations, wiring and settings are invented.
+Weather is continuous and seeded. Its seasonal means come from the NASA POWER 2001–2025 climatology at 57.5° N, 18.5° E. Wind variability, calms and the wind rose are fitted to NASA POWER hourly data at the same point, and the daily temperature range follows Visby's averages. All other numbers are assumptions, collected in `app/params.py` and marked as such. Gutnö is not a digital twin: its firms, substations, wiring and settings are invented.
 
 Not modelled in 0.1.0:
 - electromechanical and electromagnetic transients, frequency dynamics and unbalanced faults;

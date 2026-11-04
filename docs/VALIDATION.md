@@ -4,7 +4,7 @@ Everything below was run on 4 November 2026 on the release commit's code. The ma
 
 ## Automated tests
 
-`python -m pytest -q -p no:cacheprovider`: **24 passed** in about 11 s.
+`python -m pytest -q -p no:cacheprovider`: **25 passed** in about 11 s.
 
 | Area | Test | What it checks |
 |---|---|---|
@@ -12,6 +12,7 @@ Everything below was run on 4 November 2026 on the release commit's code. The ma
 | | `test_streams_are_independent_and_resume_exactly` | Named random streams do not disturb each other and resume bit for bit after saving. |
 | | `test_events_run_in_time_then_priority_order_and_survive_saving` | Events at sub-minute timestamps run in time order, then by priority group. Ids never repeat after reload. |
 | | `test_ledger_never_creates_money` | Every transfer has a payer and a payee, so all accounts sum to zero. |
+| | `test_weather_follows_the_island_climate` | Over a simulated year: wind variability and calms within the observed range, south-west the most common direction and every direction occurring, a July daily temperature swing near Visby's, an 18-hour midsummer day and a 6.5-hour midwinter day, and light June nights. |
 | World | `test_money_people_and_jobs_balance_after_a_day` | After a full day: money sums to zero, employed people equal filled jobs per POP and per firm, the POP cap holds, no numerical failures. |
 | | `test_monthly_population_account_is_exact` | `end = start + births - deaths + immigration - emigration`. |
 | | `test_hourly_plans_do_not_step_the_load` | Over three hours, no aggregated load changes across an hour boundary by more than four times its median minute-to-minute change. |
@@ -34,7 +35,7 @@ Everything below was run on 4 November 2026 on the release commit's code. The ma
 | | `test_opening_a_branch_leaves_a_sane_solution[opendss]` | Regression test, see below. |
 
 Browser tests (`node --test tests/browser_game.cjs`, Playwright with Chromium): **4 passed**.
-- The game runs on its own after the page opens and every view renders. It opens in the day theme; night and the day/night cycle can be switched on and are remembered.
+- The game runs on its own after the page opens and every view renders. It opens in the day theme; night and the day/night cycle can be switched on, fade in rather than jump, and are remembered.
 - A parcel shows its land, wind and turbine site, and a turbine can be built there.
 - Reloading the page continues from the browser save.
 - The layout fits a phone screen without horizontal scrolling.
@@ -49,6 +50,26 @@ The fix:
 - Switching opens the branch terminals (`open Line.x term=1` and `term=2`) instead of disabling the element.
 - Every solution passes a plausibility check: finite voltages, losses and source power, and losses below a quarter of the total load and generation plus 5 MW. An implausible solution is retried once from a freshly built circuit; if that also fails, it counts as a numerical failure and the last valid state is kept.
 - `test_opening_a_branch_leaves_a_sane_solution` keeps it fixed.
+
+## Weather against the island's climate
+
+The targets come from NASA POWER hourly data at the model's point, 57.5° N, 18.5° E (WS10M, WD10M and T2M, 2020–2024), and from Visby station averages for the daily temperature range. The model column is one simulated year (seed 1). Before 0.1.0's weather recalibration, wind was too steady (CV 0.34, 0.4 % calms, maximum 13 m/s), almost never blew from north-east to south-east, and had a 3 °C daily temperature swing all year.
+
+| Measure | Observed | Model |
+|---|---|---|
+| Wind at 10 m, coefficient of variation | 0.45 | 0.43 |
+| Hours below 2 m/s | 7.9 % | 6.3 % |
+| Wind autocorrelation after 6 h / 24 h / 48 h | 0.73 / 0.36 / 0.22 | 0.74 / 0.31 / 0.18 |
+| Wind from N, NE, E, SE, S, SW, W, NW (%) | 9, 8, 8, 9, 15, 25, 17, 10 | 8, 7, 6, 10, 17, 23, 20, 10 |
+| Direction persistence after 24 h (mean resultant) | 0.47 | 0.56 |
+| Daily temperature range, January / April / July | 3.9 / 8.6 / 8.2 °C (Visby) | 4.6 / 8.5 / 8.2 °C |
+| Day length at midsummer / midwinter | 18.0 h / 6.6 h (astronomy at 57.5° N, with refraction) | 18.0 h / 6.6 h |
+
+Snow lies on about 22–28 days a year, in five to eight cold spells (seeds 1–3).
+
+## Another OpenDSS finding
+
+OpenDSS `Circuit.TotalPower` adds up every voltage source. While a grid-forming battery carried the island, the mainland exchange therefore showed the battery's power. The backend now reads each voltage source's terminal power, so the mainland source and grid-forming batteries are reported separately. `test_grid_forming_battery_carries_the_island_when_the_link_is_lost` checks that the exchange is zero while islanded and that turbines plus battery balance load and losses.
 
 ## A year without the player
 

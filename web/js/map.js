@@ -5,7 +5,7 @@ PB.map = (() => {
   const P = 2;
   const canvas = PB.$('map'), ctx = canvas.getContext('2d'), wrap = PB.$('mapWrap'), labelsEl = PB.$('labels');
   let W = 0, H = 0, view = null, mode = 'island', frame = 0, drag = null, hover = null;
-  let terrain = null, terrainKey = '', zoneIndex = null, zoneFill = null, zoneFillKey = '';
+  let terrain = null, terrainNight = null, terrainKey = '', zoneIndex = null, zoneFill = null, zoneFillKey = '';
   const angle = {};
   const layers = {
     island: {zones: true, wind: false, wake: false, population: false, tourism: false, industry: true, load: false, outages: true, grid: true},
@@ -84,12 +84,13 @@ PB.map = (() => {
   }
   function buildTerrain() {
     const st = PB.static, s = PB.snap, Ld = PB.land;
-    const light = Math.round(PB.light() * 4) / 4, season = seasonOf(s), snow = s.weather.temp < .5 && season === 'winter';
-    const key = [view.cx.toFixed(3), view.cy.toFixed(3), view.z.toFixed(3), W, H, light, season, snow, layers.island.zones, mode].join();
+    const season = seasonOf(s), snow = (s.weather.snow ?? (s.weather.temp < .5 && season === 'winter' ? 1 : 0)) >= .5;
+    const key = [view.cx.toFixed(3), view.cy.toFixed(3), view.z.toFixed(3), W, H, season, snow, layers.island.zones, mode].join();
     if (key === terrainKey) return;
     terrainKey = key;
-    const pal = palette(light, season, snow);
-    const img = ctx.createImageData(W, H), d = img.data;
+    // A day and a night raster; draw() blends them by the light level, so dusk and dawn are continuous.
+    const palD = palette(1, season, snow), palN = palette(0, season, snow), teal = rgb(PB.css('--teal'));
+    const img = ctx.createImageData(W, H), d = img.data, imgN = ctx.createImageData(W, H), dN = imgN.data;
     const cls = Ld.classes, zch = Ld.zones, nx = Ld.nx;
     zoneIndex = new Int8Array(W * H).fill(-1);
     const cellIdx = new Int32Array(W * H);
@@ -100,42 +101,50 @@ PB.map = (() => {
       const [x, y] = toKm(px + .5, py + .5), k = cellAt(x, y), cl = k < 0 ? '~' : cls[k];
       cellIdx[i] = k;
       const n = noise(x * 2.5, y * 2.5), fine = noise(x * 1.7, y * 1.7), dt = dither(px, py);
-      let c;
-      if (cl === '~') {
-        const near = k >= 0 && seaNear(k);
-        c = near ? (n + dt * .4 > .78 ? pal.sea : pal.shallow) : (n * .6 + dt * .5 > .62 ? pal.sea : pal.deep);
-      } else {
-        zoneIndex[i] = zch.charCodeAt(k) - 65;
+      const near = cl === '~' && k >= 0 && seaNear(k), field = Math.floor(hash(Math.floor(x / .9), Math.floor(y / .65)) * 4);
+      let road = false, townA = false, house = false, houseA = false, reserve = false;
+      if (cl !== '~') zoneIndex[i] = zch.charCodeAt(k) - 65;
+      if (cl === 'T') {
+        road = (Math.floor(x * 6 + .5) % 4 === 0) || (Math.floor(y * 6 + .5) % 5 === 0);
+        townA = hash(Math.floor(x * 6), Math.floor(y * 6)) > .45;
+        if (!road && hash(Math.floor(x * 12), Math.floor(y * 12)) > .7) lights.push([px, py, zoneIndex[i]]);
+      } else if (cl === 'v') {
+        house = hash(Math.floor(x * 10), Math.floor(y * 10)) > .72;
+        houseA = hash(Math.floor(x * 10) + 3, Math.floor(y * 10)) > .5;
+        if (house && hash(Math.floor(x * 10) + 7, Math.floor(y * 10)) > .6) lights.push([px, py, zoneIndex[i]]);
+      } else if (cl === 'r') reserve = noise(x / 3, y / 3) > .5;
+      const shade = pal => {
+        let c;
+        if (cl === '~') return near ? (n + dt * .4 > .78 ? pal.sea : pal.shallow) : (n * .6 + dt * .5 > .62 ? pal.sea : pal.deep);
         if (cl === 'b') c = dt < .2 ? pal.foam : pal.beach;
-        else if (cl === 'T') {
-          const road = (Math.floor(x * 6 + .5) % 4 === 0) || (Math.floor(y * 6 + .5) % 5 === 0);
-          c = road ? pal.road : hash(Math.floor(x * 6), Math.floor(y * 6)) > .45 ? pal.town : pal.town2;
-          if (!road && hash(Math.floor(x * 12), Math.floor(y * 12)) > .7) lights.push([px, py, zoneIndex[i]]);
-        } else if (cl === 'v') {
-          const house = hash(Math.floor(x * 10), Math.floor(y * 10)) > .72;
-          c = house ? (hash(Math.floor(x * 10) + 3, Math.floor(y * 10)) > .5 ? pal.town : pal.town2) : pal.fields[Math.floor(hash(Math.floor(x / .9), Math.floor(y / .65)) * 4)];
-          if (house && hash(Math.floor(x * 10) + 7, Math.floor(y * 10)) > .6) lights.push([px, py, zoneIndex[i]]);
-        } else if (cl === 'F') c = fine > .5 ? pal.forest : pal.forest2;
+        else if (cl === 'T') c = road ? pal.road : townA ? pal.town : pal.town2;
+        else if (cl === 'v') c = house ? (houseA ? pal.town : pal.town2) : pal.fields[field];
+        else if (cl === 'F') c = fine > .5 ? pal.forest : pal.forest2;
         else if (cl === 'a') c = fine + dt * .3 > .6 ? pal.alvar2 : pal.alvar;
         else if (cl === 'w') c = dt < .5 ? pal.shallow : pal.forest2;
         else if (cl === 'q') c = (Math.floor(y * 8) % 2) ? pal.alvar2 : pal.road;
-        else if (cl === 'r') { c = noise(x / 3, y / 3) > .5 ? pal.forest : pal.alvar; if (((px + py) % 6) === 0) c = mix(c, rgb(PB.css('--teal')), .6); }
-        else c = pal.fields[Math.floor(hash(Math.floor(x / .9), Math.floor(y / .65)) * 4)];
+        else if (cl === 'r') { c = reserve ? pal.forest : pal.alvar; if (((px + py) % 6) === 0) c = mix(c, teal, .6); }
+        else c = pal.fields[field];
         if (pal.snowy && cl !== 'T' && cl !== 'q') c = mix(c, (fine + dt * .5 > .7) ? pal.snow2 : pal.snow, cl === 'F' ? .55 : .85);
-      }
+        return c;
+      };
+      const c = shade(palD), cN = shade(palN);
       d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      dN[o] = cN[0]; dN[o + 1] = cN[1]; dN[o + 2] = cN[2]; dN[o + 3] = 255;
     }
     if (layers.island.zones || mode === 'grid') {
-      const line = mix(pal.town2, [20, 20, 30], .4);
+      const line = mix(palD.town2, [20, 20, 30], .4), lineN = mix(palN.town2, [20, 20, 30], .4);
       for (let py = 1; py < H; py++) for (let px = 1; px < W; px++) {
         const i = py * W + px, a = zoneIndex[i];
         if (a >= 0 && ((zoneIndex[i - 1] >= 0 && zoneIndex[i - 1] !== a) || (zoneIndex[i - W] >= 0 && zoneIndex[i - W] !== a)) && ((px + py) & 1)) {
-          const o = i * 4; d[o] = line[0]; d[o + 1] = line[1]; d[o + 2] = line[2];
+          const o = i * 4; d[o] = line[0]; d[o + 1] = line[1]; d[o + 2] = line[2]; dN[o] = lineN[0]; dN[o + 1] = lineN[1]; dN[o + 2] = lineN[2];
         }
       }
     }
     terrain = document.createElement('canvas'); terrain.width = W; terrain.height = H;
     terrain.getContext('2d').putImageData(img, 0, 0);
+    terrainNight = document.createElement('canvas'); terrainNight.width = W; terrainNight.height = H;
+    terrainNight.getContext('2d').putImageData(imgN, 0, 0);
     PB.map.cellIdx = cellIdx;
     zoneFillKey = '';
   }
@@ -189,10 +198,12 @@ PB.map = (() => {
     resize(); buildTerrain(); buildZoneFill();
     frame++;
     ctx.imageSmoothingEnabled = false;
+    const light = PB.light();
     ctx.globalAlpha = 1; ctx.drawImage(terrain, 0, 0);
+    if (light < .995) { ctx.globalAlpha = 1 - light; ctx.drawImage(terrainNight, 0, 0); ctx.globalAlpha = 1; }
     if (mode === 'grid') { ctx.fillStyle = document.documentElement.dataset.theme === 'day' ? 'rgba(248,240,220,.55)' : 'rgba(9,13,27,.55)'; ctx.fillRect(0, 0, W, H); }
     if (zoneFill) ctx.drawImage(zoneFill, 0, 0);
-    const s = PB.snap, st = PB.static, night = 1 - PB.light();
+    const s = PB.snap, st = PB.static, night = 1 - light;
     if (mode === 'island') { if (layers.island.wind) drawWind(s); if (layers.island.wake) drawWakes(s); }
     if (mode === 'island' && night > .2) drawLights(s, night);
     if (mode === 'grid' || layers.island.grid) drawBranches(s, st);
