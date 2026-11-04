@@ -1,17 +1,13 @@
 name: powerbolaget
 services:
   game:
-    image: powerbolaget:0.0.1
+    image: powerbolaget:0.1.0
     build: .
     init: true
     ports:
       - "127.0.0.1:${POWERBOLAGET_PORT:-8082}:8082"
-    volumes:
-      - saves:/data
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-volumes:
-  saves:

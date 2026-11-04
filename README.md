@@ -1,110 +1,128 @@
-# Powerbolaget 0.0.1
+# Powerbolaget 0.1.0
 
-A power-supply and offshore wind-farm planning game set in an unnamed Baltic coastal city. Wind supplies the city, batteries balance energy, and the external grid provides backup. The existing farm has 20 MW of capacity; expand it or plan up to four custom plants.
+An open regional energy, economy and society simulation. You run **Powerbolaget**, the energy company of **Gutnö**, a fictional island modelled on the scale, climate and economic geography of Gotland. You plan, build and operate the island's grid: wind turbines, batteries, lines and transformers. The rest of the island lives its own life. The weather changes, and residents work, shop, move, are born and die. Visitors come in summer. Firms plan production, hire, invest and sometimes leave, and equipment fails and gets repaired.
 
-## Deploy with Docker
+There is no win condition and no score. The game reports what happens and why, and you decide what to change.
 
-Linux is the only supported native runtime. Install Docker Engine and the Docker Compose plugin on Linux. Windows must run Powerbolaget through Docker Desktop with Linux containers; native Windows execution is unsupported. On macOS, use Docker Desktop with Linux containers. The same Compose files run the Python 3.12 application and native OpenDSS dependencies inside a Linux container; no host Python installation is required.
+The game starts on 1 January, year 1 of the **Fantasy Era** (幻想纪元), and starts running as soon as the page opens.
+
+## Run it
+
+With Docker:
 
 ```sh
-git clone https://github.com/lonaparte/powerbolaget.git
-cd powerbolaget
 docker compose up -d --build
 ```
 
-Open http://127.0.0.1:8082. The service publishes port 8082 on host loopback and runs one application worker. Check startup and logs with:
+Open http://127.0.0.1:8082. The service publishes port 8082 on host loopback only; to use another host port, create a `.env` file beside `compose.yaml` containing `POWERBOLAGET_PORT=8083`. Stop it with `docker compose down`; update with `git pull --ff-only && docker compose up -d --build`.
 
-```sh
-docker compose ps
-docker compose logs -f game
-```
-
-Saves live in each player's browser, not on the server. The server signs every game state it returns and only computes on states carrying its signature. The `saves` named volume keeps just that signing key, `/data/state.key`, across restarts, rebuilds and `docker compose down`. If the key is lost or replaced, browsers rebuild their saves from the recorded commands automatically. To run several instances, give them the same key through `POWERBOLAGET_SECRET`. To stop or restart the service:
-
-```sh
-docker compose down
-docker compose up -d
-```
-
-To change the host port, create a `.env` file beside `compose.yaml` containing `POWERBOLAGET_PORT=8083`, then run `docker compose up -d`. The container continues listening on port 8082; open http://127.0.0.1:8083 on the host.
-
-Before upgrading a version that stores saves in server-side SQLite, export each scenario through that version's saves menu. The browser-save version does not automatically migrate `coastal.sqlite3`; load the exported files through **Saves / scenarios** after the upgrade.
-
-To update the application:
-
-```sh
-git pull --ff-only
-docker compose up -d --build
-```
-
-## Plan, build and operate
-
-1. Select **Plan a wind farm**, enter a turbine count, or add turbines and junctions individually.
-2. Select a node to edit its position, rated power, hub height, rotor diameter, power curve and transformer. Select a cable to edit length, R/X/C, ampacity and switch state. Drag nodes and wire freely, or start from radial, star or ring templates. Moving a node preserves cable lengths; **Recalculate lengths** updates them explicitly.
-3. Select the substation to configure 35/66 kV collection, the site transformer and additional onshore storage. Configure vessels, engineering and electrical teams, supply lines, water depth and port distance.
-4. Select **Validate & schedule**. The system checks connectivity and real OpenDSS AC power flow, then calculates the critical path and commissioning date from quantities, dependencies, resources and hourly weather windows. Construction duration cannot be entered manually.
-5. Approve construction when funds are sufficient. Approval freezes the plan and charges its cost. The plant generates no power during construction and joins the network at its calculated commissioning time. Select it in the farm menu to inspect topology, cable loading and turbine output.
-6. **Coastal weather** shows wind, temperature, irradiance, daylight and seven days of simulated weather. Continuous functions and smooth seeded disturbances generate conditions; monthly data calibrate coefficients. Weather remains continuous at midnight and is reproducible from the seed. The browser computes the seven-day outlook itself from the same climate function, and `tests/test_browser_climate.py` checks it against the Python implementation.
-
-The application, API messages and development documentation use English. The default four-turbine 5 MW plan, seed 42, January 1 start and default resources produce a 133-day schedule. The reference Baltic One plan adds a ring cable, a 110 m hub and 2 MW / 8 MWh storage and produces a 138-day schedule. Changes to quantities, resources or start date recalculate these results.
-
-Every action is saved in the browser (IndexedDB), together with the last seven days of chart history. The saves menu exports a save file, holding the replayable command list, the signed state and the chart history, and loads one back; files exported by earlier versions contain only commands and are replayed. Checkpoints stay in the browser. A scenario lasts 365 days; projects cannot be approved if they finish after that horizon. The replay format remains compatible with earlier versions. Old replays use the current weather and scheduling model, so historical numerical results can differ.
-
-## Day and night
-
-The interface uses a pixel-art style with a day and a night palette. In **Auto** mode the theme follows the simulated clock and the coastal climate's sunrise and sunset; the header toggle cycles Auto, Day and Night and is remembered by the browser. The coastal map is drawn as pixel art from the live simulation: rotors turn with turbine output, dots on the cables show power flowing to the substation, city, battery and grid, isolated circuits turn red, the four city districts appear as load zones on their 10 kV feeders and light up at night only where their demand is served, cloud shadows and sea streaks follow the wind, and land is snow-covered below freezing. Select a turbine on the map for details.
-
-## Model scope
-
-This is a reviewable teaching and planning model. OpenDSS constrains currents, losses, voltages and transformer capacity; battery energy is conserved across intervals. NASA POWER 2001–2020 gridded climatology calibrates the Baltic coastal climate functions. City demand represents a demonstration district rather than measured whole-city consumption.
-
-Construction uses an original quantity and critical-path approximation. Productivity, manufacturing lead times, vessel prices and wave relationships are scenario assumptions. ORBIT is a methodological reference, not an imported library. Custom rings participate in power flow, but individual cable directional protection is not implemented. Fault controls target the six original fault locations. Batteries aggregate at the shared onshore bus; grid-following storage does not support independent islanding or black start. See [Model documentation](docs/MODEL.md).
-
-## Dependencies and electrical solvers
-
-External Python dependencies are declared once, by role, in `pyproject.toml` (`web`, `solvers`, `test`); `requirements.lock` pins the complete set for Python 3.12 on Linux. One command installs them, and the Docker image runs the same command:
+Without Docker (Linux, Python 3.12):
 
 ```sh
 python3.12 -m venv .venv
 .venv/bin/python tools/deps.py install
+.venv/bin/python run.py
 ```
 
-It installs the pinned set, runs `pip check` and solves a test feeder with every electrical backend. `python tools/deps.py check` repeats the backend check; `python tools/deps.py lock` re-pins `requirements.lock` after a group changes.
+Saves live in your browser, not on the server, so restarting or updating the server never loses a game. The page autosaves every 45 seconds and whenever it is hidden. **Save ▾** saves now, exports a save file, loads one and starts a new game with a chosen seed. Save files from 0.0.1 (the coastal-city scenario) belong to a different game and cannot be loaded.
 
-Electrical calculation libraries are used only through `app/solvers/`. `app/solvers/model.py` defines the backend-neutral network description and the solver contract: element switching, generator and load setpoints, AC power flow, bus voltages, line and transformer flows, losses, source power and short circuit. `app/solvers/opendss.py` adapts OpenDSSDirect.py and is the only module that imports it; game code in `app/network.py` describes the grid and calls the contract. To add a library, add it to the `solvers` group, install it in a Python 3.12 environment, run `python tools/deps.py lock`, write `app/solvers/<name>.py` with a `Backend` class and register it in `app/solvers/__init__.py`. `tests/test_solvers.py` fails if a calculation library is imported elsewhere in `app/` and checks every registered backend against the same contract.
+## Playing
 
-## Validate
+The screen has three views of the same world, a context inspector on the right and a dock at the bottom.
 
-Run the Python model and API tests in a disposable container using the same image:
+- **Island**: the pixel-art map. Land use is drawn from the island's 0.5 km parcels: towns, villages, farmland, forest, limestone heath (alvar), wetland, quarries, nature reserves and shore. You can switch on layers for zone borders, wind, turbine wakes, population, tourism, industry, load density, outages and power lines. Seasons, snow, night and town lights follow the simulation, and a town goes dark where it loses supply.
+- **Grid**: the electrical network on the same map. Buses are coloured by voltage and branches by loading, and moving dots show the power flow. Open or tripped breakers show as red dashes, de-energised areas as grey.
+- **Economy**: socio-economic statistics, with pages for overview, regions, POPs, firms, markets, finance and demography.
+- **Inspector**: click anything to see its current values, history and causes:
+  - a turbine, line, bus, substation, battery or the mainland links;
+  - a zone, a firm or a POP;
+  - a land parcel: land use, people, wind resource, distances, and whether and at what cost a turbine may be built there.
+- **Build** (island view): wind turbines (PB-2.3, PB-3.6 or PB-5.6), batteries (optionally grid-forming), 110 kV lines and transformer units. Every build shows a server-side preview of cost, construction time and electrical connection. Projects are paid monthly; if Powerbolaget runs out of cash, the shortfall is booked as external financing.
+- **Operate**: start and end turbine maintenance, open and close breakers, set battery modes and the link operating margin.
+- **Time**: the clock runs by itself. Space pauses. Speeds are 10 simulated minutes, 1 hour, 6 hours or 1 day per second, as fast as the server allows. The dock shows the island balance minute by minute for the last four hours and hour by hour for the last three days, plus events, projects (yours, firms' expansions and the grid operator's) and pinned objects.
+
+The interface has a day and a night palette. In **Auto** mode it follows the simulated sun; the header toggle switches between Auto, Day and Night.
+
+## What is simulated
+
+The design is documented in `docs/MODEL.md`, mapped section by section to the v0.2 specification.
+
+- **World core.** One authoritative state, one event clock, a double-entry money ledger and independent random streams. Events have sub-minute timestamps. Hour, day and month boundaries settle the completed period before anyone plans the next.
+- **Island.** About 55,000 residents in 18 economic zones. Zones are dense where people are dense, with seven in and around the main town of Västerhamn (the Visby counterpart). The countryside forms large zones around small coastal towns and inland service villages.
+- **Society.** About 190 POP objects (the cap is 10,000): residents grouped by zone and sector, visitors, holiday-home users and seasonal workers.
+  - Daily: incomes, transfers and spending.
+  - Tourism: arrivals, stays and departures, limited by beds and ferry seats.
+  - Monthly: births, deaths, ageing and logit migration driven by jobs, wages, housing, amenities and outages. The population account balances exactly.
+- **Economy.** Firms with bounded rationality:
+  - each plans the next hour from its own forecast, stock, inputs, staff and the electricity price;
+  - output comes from what its equipment actually did, so a tripped cement kiln needs eight hours to warm up again;
+  - island markets clear between mainland import and export prices;
+  - a labour market, investment with hysteresis, and new investors (a data centre) who decide by themselves to come.
+- **Load Profile Engine.** Continuous minute-level P/Q from hourly plans. Plans ramp from the current value, so the top of the hour never jumps. Zone thermal models produce real cold-load pickup after an outage, and machines are discrete state machines.
+- **Energy.**
+  - AC power flow every simulated minute in OpenDSS, on the full 220/110/33/20/0.69 kV network, with every turbine and its unit transformer modelled.
+  - Jensen wakes inside each wind farm.
+  - An automatic operator balances the island with the mainland links, then batteries, then wind curtailment, and last load shedding by priority class.
+  - On-load tap changers regulate the 20 kV and 110 kV busbars.
+  - Faults depend on weather, age and maintenance. Protection trips, overhead lines reclose, and repairs take time. Grid-forming batteries can carry the island when the mainland is lost.
+  - A power flow that does not converge is reported as a numerical failure, never as a blackout.
+- **Mainland links.**
+  - The existing HVDC: two links of 130 MW.
+  - The grid operator's planned HVAC link: two 220 kV AC subsea cables to Stenkumla south of the main town, after Svenska kraftnät's Gotland connection plan (in service from 2031, which is FE 6). It starts at 150 MW on 1 Sep FE 6, reaches 300 MW with the second cable on 1 Mar FE 7, and 440 MW in FE 9.
+  - With the AC link in service, the island is synchronous with the mainland and the HVDC runs on a schedule. If the AC link is lost, the HVDC converter forms the island grid again.
+
+Weather is continuous and seeded, and calibrated with the NASA POWER 2001–2025 climatology at 57.5° N, 18.5° E. All other numbers are assumptions, collected in `app/params.py` and marked as such. Gutnö is not a digital twin: its firms, substations, wiring and settings are invented.
+
+Not modelled in 0.1.0:
+- electromechanical and electromagnetic transients, frequency dynamics and unbalanced faults;
+- offshore wind;
+- a nodal electricity market (tariffs follow a mainland reference price);
+- road and ferry traffic beyond ferry seat capacity.
+
+## Architecture
+
+- `app/` is the headless simulation core. It runs in worker processes: OpenDSS contexts work only from the thread that created them. Each worker serves its sessions from its main thread and uses one CPU core. Configure with `POWERBOLAGET_WORKERS` (default 1), `POWERBOLAGET_MAX_SESSIONS` (default 8) and `POWERBOLAGET_IDLE_SECONDS` (default 1800).
+- If a worker restarts, browsers reload their saves automatically. Saves are untrusted input: ids, catalog references and sizes are checked before a world is rebuilt.
+- `web/` is the client: plain HTML, CSS and JavaScript, with no build step.
+- Measured on one core of a 2.1 GHz Xeon server: about 125 ms of computation per simulated hour (2 ms per simulated minute, of which about 1.1 ms is the power flow). That is about 3 s per simulated day, or 18 minutes per simulated year. `results/benchmark-365d.json` has the full record of a year run without any player input.
+
+Electrical calculation libraries are imported only in `app/solvers/`, behind one contract (`app/solvers/model.py`). `tests/test_solvers.py` fails if any other module imports one. OpenDSS (through OpenDSSDirect.py) is the default backend; pandapower was evaluated earlier and was about 35 times slower for this use.
+
+## Development
 
 ```sh
-docker compose run --rm --no-deps game python -m pytest -q -p no:cacheprovider
+.venv/bin/python tools/deps.py install      # pinned dependencies, then a test feeder on every solver backend
+.venv/bin/python -m pytest -q -p no:cacheprovider
+.venv/bin/python tools/benchmark.py --days 30 --output results/benchmark-30d.json
+node --check web/js/*.js
 ```
 
-For frontend development, JavaScript syntax checks can be run from a Linux shell with Node.js installed:
-
-```sh
-node --check web/app.js
-node --check web/planner.js
-node --check web/pixel.js
-node --check web/climate.js
-node --check web/saves.js
-```
-
-Browser save regression tests use Playwright and Chromium against a disposable local Python server:
+Browser tests use Playwright and Chromium against a throwaway local server:
 
 ```sh
 npm install --no-save --package-lock=false playwright
 npx playwright install chromium
-POWERBOLAGET_TEST_PYTHON=.venv/bin/python node --test tests/browser_saves.cjs
+POWERBOLAGET_TEST_PYTHON=.venv/bin/python node --test tests/browser_game.cjs
 ```
 
-The browser suite checks in-flight scenario changes, atomic cross-tab saves, failed writes, legacy-file import, invalid files, a second open tab, signing-key recovery and the memory-only storage fallback. `POWERBOLAGET_TEST_CHROMIUM` can select an existing Chromium executable.
+The Python suite covers:
+- the calendar, random streams, events and ledger;
+- conservation of money, people and jobs;
+- loads that do not step at hour boundaries;
+- power balance and energy bookkeeping every minute;
+- outages that trip equipment at once, with warm-up after restoration;
+- fault, protection and repair;
+- islanding on a grid-forming battery, and blackout without one;
+- the HVAC link taking over from and failing over to the HVDC;
+- determinism, and save/load continuation within tolerance;
+- construction rules and save validation;
+- the HTTP API;
+- the solver contract, including a regression test for OpenDSS branch switching.
 
-The model/API suite covers planning, scheduling, continuous climate, commissioning, protection, save handling and the solver boundary. `tests/endurance.py` validates all 35,040 intervals of a simulated year. See [Validation records](docs/VALIDATION.md), raw evidence in `results/`.
+The browser suite covers auto-run, every view, parcels and building, reload from the browser save, and the phone layout. Results are recorded in `docs/VALIDATION.md`.
 
 ## License and release folder
 
-Original project code uses the MIT License. The bitmap display font `web/pixel-font.woff` is original and generated by `tools/pixel_font.py`, which needs fontTools only when regenerating it. The complete root `LICENSE` retains the original copyright. Dependencies retain their own licenses, including the OpenDSSDirect.py Alliance terms and native KLU, Eigen and NumPy components. See `LICENSE-REVIEW.txt`, hashes and provenance in `results/license-inventory.json`, and original texts in `licenses/`.
+Original project code uses the MIT License; the complete `LICENSE` retains the original copyright. The bitmap display font `web/pixel-font.woff` is original and generated by `tools/pixel_font.py`. Dependencies keep their own licenses, including the OpenDSSDirect.py Alliance terms and native KLU, Eigen and NumPy components; see `LICENSE-REVIEW.txt`, `THIRD-PARTY-NOTICES.txt`, `results/license-inventory.json` and `licenses/`.
 
-`DEVELOPMENT-TREE.txt` lists the source release. `tools/package.py --output <new-folder-path>` creates a clean `Powerbolaget-0.0.1/` folder for upload without an archive. The folder includes source, Docker deployment files, documentation, examples, any available screenshots and licenses and excludes Git metadata, saves, backups, virtual environments and third-party binaries.
+`DEVELOPMENT-TREE.txt` lists the source release. `tools/package.py` creates a clean `Powerbolaget-0.1.0/` folder beside the repository (or the new folder given with `--output`) for upload. It makes no archive and leaves out Git metadata, virtual environments and third-party binaries.

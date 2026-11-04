@@ -1,4 +1,4 @@
-Powerbolaget 0.0.1 — Third-party license inventory (2026-10-11)
+Powerbolaget 0.1.0 — Third-party license inventory (2026-11-04; dependency lock unchanged since 2026-10-11)
 Scope: installed pinned Python packages, the legacy npm lockfile, and reviewed native-library notices. This is not a complete binary-level SBOM.
 The frontend uses native HTML / CSS / JavaScript / SVG without a new framework. NASA POWER provides climate calibration data; ORBIT / SAM / NREL reports are methodological references rather than imported libraries.
 This source release does not distribute Python, DLLs, .venv, Godot or node_modules. Original license texts are retained below.

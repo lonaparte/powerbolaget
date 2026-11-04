@@ -1,129 +1,192 @@
-# Powerbolaget model documentation
+# Powerbolaget 0.1.0 — model description
 
-Version: 0.0.1. The game demonstrates constraints between wind farms, batteries, collectors and protection while supplying an unnamed Baltic coastal city with external-grid backup. Costs, schedules, weather synthesis and relay settings are scenario assumptions rather than field engineering data or recommended settings.
+This document maps the implementation to the *Powerbolaget game design and simulation specification v0.2*, section by section. Each item is marked:
+- **Implemented**: as the spec describes it.
+- **Simplified**: implemented in a reduced form; the reduction is stated.
+- **Deferred**: not in 0.1.0.
 
-## Electrical structure
+Every coefficient that is not a measurement is an assumption. They are collected in `app/params.py` (economy, society, tariffs, costs) and in the module that uses them (fault rates in `app/energy.py`, load shapes in `app/loads.py`).
 
-```text
-External grid: 110 kV / 1000 MVA short-circuit capacity
-       ↕ 31.5 MVA, 110/35 kV transformer, X = 10%
-35 kV bus ← two radial collectors ← 0.69/35 kV unit transformers ← turbines
-       ↕ PCS + battery storage
-       ↓ 20 MVA, 35/10 kV city transformer, X = 8%
-10 kV feeders → harbor / center / homes / water and hospital
-```
+## 0. Decisions
 
-OpenDSS solves the balanced three-phase AC network in snapshot mode every 15 minutes. Wind and storage use controlled P/Q equivalents; districts use aggregated constant-power loads with fixed power factors. Lines have positive- and zero-sequence R/X/C parameters. Transformers include copper and no-load losses. Each original turbine has a 5.5 MVA transformer. Station auxiliaries consume 50 kW.
+| Spec 0.1 | Status |
+|---|---|
+| 1. Open-ended, no score or win condition | Implemented. The UI reports states, trends and causes only. |
+| 2. Player is Powerbolaget, with full authority over energy assets; firms and residents decide for themselves | Implemented. Commands cover only Powerbolaget's assets (build, maintenance, switching, batteries, link margin). The HVAC interconnector is built by the grid operator, not the player. |
+| 3. A fictional world close to Gotland | Implemented. Gutnö's coastline is traced from Gotland. Population follows Gotland's pattern: about half in and around a main town on the west coast, the rest mostly in small coastal towns. Firms, wiring and settings are invented. |
+| 4. Energy, Economic Production and Society models on one World Simulation Core, plus a Load Profile Engine | Implemented: `world.py`, `energy.py` and `grid.py`, `economy.py`, `society.py`, `loads.py`. |
+| 5. Layered event coupling, POP state with probabilistic transitions, bounded-rational firms | Implemented. |
+| 6. About 20 zones; at most 10,000 POP objects | 18 zones, dense where people are dense. About 190 POPs; the cap is enforced (`society.check_cap`). |
+| 7. Society and economy hourly and daily, slow variables monthly; grid every minute; events at their own timestamps | Implemented. Transient-stability windows are deferred (see 6.2). |
+| 8. Every turbine is its own device with a real collector connection | Implemented. Each turbine has its own 0.69 kV bus, unit transformer and collector cable. |
+| 9. Hourly plans never step the load; real switching is not smoothed | Implemented; tested in `tests/test_world.py`. |
+| 10. No speed target; measure first | Measured: about 125 ms per simulated hour on one core of a 2.1 GHz Xeon server (`results/benchmark-365d.json`). |
+| 11. Three views with layers, inspector and pinned objects | Implemented, in an HTML client (see 10.1). |
+| 12. Free investment with full bookkeeping; reference-price tariffs | Implemented. Shortfalls are booked as external financing. |
 
-| Item | Initial/default value | Expansion/behavior |
+The game starts on 1 January, year 1 of the **Fantasy Era** (幻想纪元). The calendar has 365-day years and fixed local time UTC+1 with no daylight saving (`app/calendar.py`).
+
+## 1. World
+
+- **Geography** (`app/island.py`). Coordinates are in km, converted from longitude and latitude at 57.5° N. The coastline is anchored at Hoburgen, the Burgsvik bay, Näsudden, Ronehamn, Ljugarn, Östergarn, Slite, Fårösund, Hallshuk, Visby and Klintehamn, plus a separate islet like Fårö. Land area is about 3,400 km².
+- **Zones.** 18 economic zones, each defined as the land nearest its centre:
+  - seven in and around Västerhamn (old town, harbour, east, Gråbo, south, north, hinterland), between 6 and 162 km² each;
+  - eleven covering the countryside, between 120 and 570 km² each.
+- **Towns.** Each zone has a main settlement drawn at real scale. Examples: Västerhamn Innerstad 4,200, Kalkudden (Slite) 1,500, Strandvik (Klintehamn) 1,500, Hemby (Hemse) 1,900, Romsta (Roma) 900.
+- **Land** (`app/land.py`). 0.5 km parcels: sea, shore, town, village, farmland, forest, limestone heath, wetland, quarry and nature reserve. Land use is world data, not decoration:
+  - the map draws it;
+  - turbine siting obeys it (no turbines in towns, villages, quarries, reserves or on the shore, and at least 500 m from homes);
+  - wind roughness depends on it;
+  - parcel population estimates spread each zone's residents by settlement weight.
+- **Mainland boundary.** Goods trade at mainland reference prices plus or minus freight. Visitors and immigrants come from the mainland. Electricity flows over the links at a reference price (`World.energy_price`).
+
+## 2. Architecture and ownership
+
+| State | Owner | Where |
 |---|---|---|
-| Wind | 4 × 5 MW | 8 × 5 MW; calculated schedule |
-| Collectors | Two strings, up to four turbines each, 300 A | Upgrade to 500 A; calculated schedule |
-| Storage | 6 MW / 24 MWh | 12 MW / 48 MWh; calculated schedule |
-| Import/export limits | 12 / 5 MW | Adjustable from 0 to 20 MW |
-| Aggregated load ratings | Harbor 3.2, center 3.5, homes 4.2, water/hospital 1.8 MW | Seasonal and diurnal factors |
-| Critical load fractions | 55%, 30%, 20%, 85% | Noncritical load is shed first, proportionally |
-| Voltage target | 0.94–1.06 pu | Curtail or shed after reactive control |
+| POPs, household money | Society | `world.pops`, ledger accounts `pop:<id>` |
+| Firms, stock, plans, investment | Economy | `world.firms`, `world.markets`, `world.jobs` |
+| Buses, branches, turbines, storage, links | Energy | `world.grid` (data), `grid.Network` (compiled solver, never saved) |
+| Load devices, trajectories, thermal states | Load engine | `world.devices` |
+| Time, events, random state, ledger, projects, history | World core | `world.py`, `events.py`, `rng.py`, `ledger.py` |
 
-The first collector section is 2.5 km and subsequent sections are 0.882 km, with R1 = 0.12 Ω/km and X1 = 0.10 Ω/km. City feeders are 1.8–4.1 km with R1 = 0.12 Ω/km and X1 = 0.09 Ω/km. Collector upgrades change ampacity only, representing additional capacity without detailed construction or cable thermal modeling. The city is a moderate-size demonstration district. The map is schematic; impedances use explicit parameters rather than screen distances.
+Solvers only read a snapshot and return results (`app/solvers/`).
 
-## Turbines and wakes
+Ids: `zone_id` z01–z18, `pop_id` `<zone>_<group>`, `firm_id`, `equipment_id` `<firm>_<key>`, `bus_id`, `branch_id`. A zone maps to buses through its 20 kV feeder bus; firms connect to their own bus (the cement works to `ind_kal`).
 
-The 5 MW rating, 126 m rotor, 90 m hub, 3 m/s cut-in, 11.4 m/s rated speed and 25 m/s cut-out follow the [NREL reference turbine report](https://www.nrel.gov/docs/fy09osti/38060.pdf) and its [PNNL listing](https://tethys.pnnl.gov/publications/definition-5-mw-reference-wind-turbine-offshore-system-development).
+## 3. Layered event coupling
 
-Power uses cubic interpolation between cut-in and rated points, then clips at rated power. Ideal-gas density corrects equivalent wind speed. This is not an OpenFAST aeroelastic simulation. After storm shutdown, wind must remain below 20 m/s for two intervals before restart; this rule is a scenario assumption.
+The minute loop in `World.advance` follows spec 3.2:
+1. Integrate the interval just ended from the last solved state, at constant power between solves.
+2. On boundaries, settle the completed hour, day and month (production, bills, markets, wages, demography, investment). Only then do the society and economy plan the next period from what is known, using forecasts rather than the future.
+3. Requests, then dispatch, then AC power flow, then protection.
+4. Queued events inside the minute are handled at their own timestamps: integrate up to the event, apply it, solve again.
 
-Directional Jensen-type wakes use expansion coefficient 0.05 and thrust coefficient 0.8. Multiple deficits combine by root-sum-square. Rotor overlap uses a smooth local approximation rather than exact area integration. Original spacing is 7D / 5D. Stopped turbines produce no operating wakes. Site roughness, terrain, turbulence intensity, thrust curves, yaw control, wave loads and cable installation dynamics are omitted; results do not establish energy guarantees or structural loads.
+Ordering and safety:
+- Protection actions sort before restorations, equipment commands, commissioning and economic events at the same instant.
+- Event ids never repeat, so a reloaded save cannot run an event twice.
+- A tripped machine stays down until its restart delay has passed, whatever the plan says.
 
-## Storage and dispatch
+Messages: firm and society plans (spec: ActivityPlan) become device targets and equipment events. Device requests per minute are the spec's DemandTrajectory. Served energy per device and hour is the PhysicalResult. Hourly bills and output settlement are the EconomicSettlement. Request, served and billed energy are separate fields.
 
-Physical SOC limits are 15%–90%; initial SOC is 60%. Charge and discharge efficiencies are each 96%, giving 92.16% AC round-trip efficiency. Each interval is 0.25 h; positive P means discharge:
+## 4. Society
 
-- Discharge: `E_new = E_old − P × dt / 0.96`.
-- Charge: `E_new = E_old − P × dt × 0.96`.
-- PCS active power is limited by MW rating, reactive power by the apparent-power capability circle; storage S = 1.1 × rated P.
+- **POPs.** Residents by zone and group: industry, agriculture, hospitality, services, public, construction, retired, youth. Working groups track employed and inactive people separately. Visitors, holiday-home users and seasonal workers are POPs too. Money sits in ledger accounts; moving people take their share of it with them.
+- **Daily.**
+  - Pensions, child and unemployment benefits from the region, and family support from working adults to the zone's children.
+  - Necessities first: housing (part spent locally on construction), off-island spending and food. Then discretionary local services, scaled by income, wealth and price elasticity.
+  - Rural residents make shopping trips to the main town.
+- **Tourism.** Arrivals depend on season, weekday, forecast weather and lodging price, limited by free beds and ferry seats. Stays average 3.6 days. Holiday-home occupancy follows season and weekends. Visitors are funded from the mainland and their unspent money returns there.
+- **Monthly.**
+  - Births and deaths by group.
+  - Ageing: school leavers join the labour force in the sector with most vacancies nearby; workers retire.
+  - Migration: movers are drawn from the unemployed, from a small share of the employed, and from residents pushed by outages. They then choose by logit among zones with free housing and the mainland. Utility covers nearby vacancies, amenity, housing tightness and outage hours.
+  - Immigration responds to vacancies and unemployment.
+  - The monthly account `end = start + births - deaths + in - out` is exact (`world.demography`).
+- **Simplified:** no age-specific fertility, no household formation model, and no explicit commuting matrix. Jobs are matched within 40 km.
 
-Wind serves the city and auxiliaries first, then charges batteries, exports within the limit and finally curtails. Self-use discharges to a normal reserve SOC of 30%; insufficient backup permits further discharge to 15%. The reserve strategy supplies only deficits beyond the import limit. Noncritical loads are shed before critical loads. If imports are disabled and available energy cannot cover auxiliaries and no-load losses, the station stops and is reevaluated next interval.
+## 5. Economy
 
-Dispatch iterates with actual AC losses and limits currents, city-transformer loading and voltage. Reactive control is a finite-gain Volt-var approximation; original turbines operate within a 5.5 MVA capability circle. Battery temperature, degradation, cell imbalance, electrochemical resistance and DC-bus dynamics are omitted. SOC represents aggregated stored energy.
+- **Firms.** Large industry is modelled individually:
+  - a cement works with kiln, raw mills, cement mills and auxiliaries;
+  - two limestone quarries;
+  - a dairy, a feed mill, a slaughterhouse and a brewery;
+  - a ferry terminal with shore power on the sailing schedule;
+  - a hospital and a construction firm.
 
-Expansion batteries commission at minimum SOC. Adding 24 MWh adds 3.6 MWh stored energy, requiring 3.75 MWh purchased precharge; 0.15 MWh is conversion loss. This is commissioning energy settlement rather than an instantaneous PCS simulation. Initial and commissioning energy are excluded from wind generation. Direct wind share is `min(wind power, city power served) / city power served`, excluding battery discharge.
+  Services, public services, hospitality and agriculture are aggregated per zone. A data centre may come by itself when power is cheap and reliable.
+- **Hourly planning.** Each firm decides which machines run in the coming hour from its stock, its targets and the electricity price, and issues start and stop events at staggered minutes. For example, the cement mills run on cheap hours while the silos have room, which is load shifting.
+- **Production.** Output is settled from what the equipment actually did:
+  - equipment that tripped produced nothing while it was down;
+  - the kiln restarts through an eight-hour warm-up at 35 % power;
+  - services output follows staff present and served power.
+- **Markets.**
+  - Island markets for traded goods: local sellers first, the rest imported at import parity. Prices move between export and import parity with scarcity.
+  - Exporters ship stock above target, within ship capacity.
+  - Local services, lodging and ferry trips clear against each firm's daily capacity; unmet demand is recorded.
+- **Labour.** Monthly hiring of unemployed people of the same sector within commuting distance, with limited retraining, and gradual layoffs. Hospitality hires seasonal workers in summer.
+- **Investment.** Expansion requires four months of high utilisation and margin; cutting capacity requires eight months of losses. Each decision is followed by a cooldown (hysteresis). Expansions are construction projects paid monthly.
+- **Money.** A double-entry ledger in which every payment has a payer and a payee, so the sum of all accounts stays zero (tested). Exports, imports, visitors, immigration, state grants and financing pass through `external` and `financing`.
+- **Electricity bills.** Hourly, from served energy:
+  - households: last month's reference price plus retail margin and network fee;
+  - businesses: the same price with the business network fee;
+  - industry: an annual contract price.
+- **Simplified:** no credit market and no explicit firm balance sheets beyond cash. Price adjustment is a bounded tatonnement.
 
-The energy ledger checks: wind + imports = served load + exports + network losses + auxiliaries + storage energy change + battery conversion losses, allowing solver residuals. Dispatch reference: [NREL SAM](https://samrepo.nlr.gov/help/battery_dispatch_fom.html).
+## 6. Energy
 
-## Faults and protection
+- **Network.**
+  - 110 kV ring between eight substations; 110/20 kV units with on-load tap changers; 20 kV feeders to every zone (a sea cable to the Fårö-like islet).
+  - Three wind farms, each with a 110/33 kV farm substation and 33 kV collector strings.
+  - The existing HVDC: two links of 130 MW.
+  - The planned HVAC: two 220 kV subsea cables, a 220/110 kV transformer at Stenkumla, and 110 kV connections to the link station and Romsta.
+- **Power flow.** OpenDSS through OpenDSSDirect.py (DSS-Extensions), every simulated minute, constant-PQ loads and generators.
+  - Branches are switched by opening their terminals. Disabling an element leaves buses with no admittance to ground, and OpenDSS then reports a converged but meaningless solution; `tests/test_solvers.py` guards against this.
+  - A solution must pass a plausibility check, otherwise it is retried once from a freshly built circuit. If that also fails, it is reported as a numerical failure and the last valid state is kept.
+- **Wind.** Power curves with air density, cut-out with hysteresis, and icing stops. Hub wind uses the seasonal shear from the 10 m and 50 m climatology, site exposure and land roughness. Wakes inside each farm use the Jensen (Park) model with root-sum-square superposition. FLORIS is not used (see Deferred).
+- **Dispatch** (automatic operator):
+  - the mainland exchange stays within link ratings and a margin;
+  - batteries shave import peaks, absorb surplus wind and follow price, keeping a reserve if grid-forming;
+  - wind is curtailed proportionally;
+  - load is shed by priority class: flexible, commercial, residential, industry, critical.
+- **Interconnectors.** Before the HVAC link, the HVDC converter is the voltage reference.
+  - From 1 Sep FE 6, the mainland AC grid becomes the reference and the HVDC runs as a scheduled injection, carrying its share of the exchange.
+  - HVAC capacity is staged: 150 MW, then 300 MW from 1 Mar FE 7, then 440 MW from FE 9.
+  - Sources: Svenska kraftnät's decision for two 220 kV AC cables Misterhult–Stenkumla, in service 2031, and a 2022 planning figure of 440 MW. The staging is an assumption.
+  - If the AC link is lost, the HVDC forms the island again. If every link is lost, a grid-forming battery forms the island while its energy lasts; without one, the island blacks out.
+- **Protection.** Faults are sampled hourly:
+  - rates per 100 km for lines and per unit otherwise;
+  - overhead lines are scaled by storm, lightning and icing; turbines by age and time since maintenance;
+  - 75 % of 110 kV overhead-line faults are transient and auto-reclose after one second. Permanent faults wait for repair (log-uniform repair times by component);
+  - a fault study records the three-phase fault current;
+  - thermal overload protection uses inverse time, and the operator recloses after 30 minutes;
+  - turbines disconnect outside 0.85–1.12 pu and restart eight minutes after their bus is live again.
+- **Deferred:** RMS or EMT dynamics (ANDES), frequency response, unbalanced faults, a PyPSA unit-commitment layer, and FLORIS. The spec asks that each be validated before use; the engine contract in `app/solvers` is where a dynamic backend would plug in.
 
-Fault controls include collector A/B three-phase short circuits, a harbor-feeder short circuit, a city-transformer internal fault, grid outage and a BMS fault. Separate OpenDSS studies use a 0.01 Ω three-phase fault with generators and loads disabled, reporting external-grid contribution on the commissioned topology. Converter current limiting, negative-sequence control, PLL behavior and dynamic fault ride-through are omitted. References: [EPRI fault studies](https://opendss.epri.com/FaultStudies.html) and [generator model](https://opendss.epri.com/Generator.html).
+## 7. Load Profile Engine
 
-| Function | Implementation | Omitted behavior |
-|---|---|---|
-| 50 | Current ≥ 8 × pickup; 30 ms trip | Sampling/filtering and transient overreach |
-| 51 | IEC standard inverse shape; default TMS 0.12 | Full-network coordination scan |
-| 87T | Known internal zone; ideal 30 ms criterion | CT differential, restraint and inrush blocking |
-| 50BF | 200 ms after local breaker failure, then 60 ms upstream opening | Redundant coils/circuits |
-| 86 | Lockout until repair and manual reset | Physical latching relay |
-| 27 / anti-islanding | Known grid outage; 200 ms trip plus 60 ms opening | Frequency/ROCOF detection |
-| BMS / PCS | Known fault; storage isolation in 80 ms | Cell temperature/voltage and fire response |
+- **Aggregated devices:** households, shops and services, public services, lodging, farms. Their drivers change at most hourly: occupied households, staff, guests, herd.
+- **Ramps.** Each hourly plan anchors at the value requested now and ramps linearly to the next target, so a new plan never causes a step. Spec 7.2.1 is respected: hourly energy is not claimed to be preserved by interpolation.
+- **Shapes.** Time-of-day shapes are smooth periodic functions; rest days and holidays use their own shapes.
+- **Heating.** Each zone has a single-node thermal model: an indoor temperature with a setback schedule, heat-pump COP depending on outdoor temperature, and electric shares of direct heating and heat pumps. Outages cool homes, and reconnection produces cold-load pickup.
+- **Equipment.** State machines (off, starting, running, stopping, tripped, warm-up). Starts and stops are events at their own times.
+- **Mapping.** Each device is attached to one bus. The zone and firm ids show who pays and who is affected.
 
-The 51 curve is `t = 0.14 × TMS / ((I / I_pickup)^0.02 − 1)` and does not operate below pickup. Default pickup is 1.2 × circuit ampacity; upstream backup uses independent timing. Slow local settings can make upstream backup trip first and expand isolation. Breaker failure and upstream backup operate in arrival order. Reference: [SEL IEC standard inverse explanation](https://selinc.com/api/download/120078/id/128502/0/). Settings are experimental, not field recommendations.
+## 8. Interfaces
 
-Normal breaker opening takes 60 ms. Failure expands isolation to the farm export breaker or city transformer. The millisecond timeline is discrete event logic; energy is integrated over later 15-minute intervals. No transient voltage or rotor waveform is computed.
+The HTTP API (`app/main.py`) is the boundary between client and core:
 
-Single-phase earth faults, zero-sequence/directional protection, arcs, CT saturation, distance protection, communications differential, reclosing coordination, low-voltage ride-through, frequency stability and relay hardware validation are omitted. Grid-following turbines and batteries trip after loss of the grid. Island supply would require grid-forming PCS, switching controls, voltage/frequency dynamics and black-start validation.
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/session` | Start a game |
+| `POST /api/session/load` | Load a game from a save |
+| `POST /api/tick` | Advance the clock and return the snapshot |
+| `POST /api/command` | Apply a player command |
+| `POST /api/preview` | Check, price and connect a planned build |
+| `POST /api/save` | Return the full state |
+| `POST /api/entity` | Inspector details |
+| `POST /api/parcel` | Parcel details |
+| `POST /api/table` | Statistics pages |
+| `GET /api/land` | The parcel grid |
 
-## Economics and validation
+POST requests need the `X-PowerGame` header and a same-origin `Origin`, and are limited to 12 MB.
 
-Initial funds are CNY 220 million. Standard expansions cost CNY 140 million for wind, 32 million for storage and 16 million for collectors. Sale/import/export rates are CNY 0.62/0.65/0.28 per kWh; variable wind cost is 0.07, unserved-energy penalty is 8, and fixed O&M is CNY 3,000/day. These gameplay assumptions exclude finance, tax, decommissioning, insurance and market quotations.
+## 9. UI
 
-Tests cover curves, density, wakes, storm restart, SOC/energy conservation, low-wind supply, outages without imports, six faults, breaker failure, repair, commissioning, saves, conflicts and input rejection. `tests/endurance.py` checks every interval of one year. Passing it does not establish grid-code compliance or engineering acceptance.
+Three views (island, grid, economy), map layers, a context inspector, parcel details, build mode with previews, a dock (balance charts, events, projects, pinned objects) and a day/night theme. Information comes in layers: the overview first, then the selected object, then its composition and history.
 
-## Custom planning and electrical topology
+## 10. Deployment, saves, performance
 
-Each farm has exactly one substation, up to 24 turbines, 41 nodes, 80 cables and 120 MW. Up to four farms can be approved per scenario. IDs are strictly validated against OpenDSS command injection. Disconnected drafts can be saved, but approval requires every node to have a closed path to the substation. Normally open ties, parallel branches and closed rings are supported; rings warn that directional protection needs separate design.
+- **10.1 Client.** The spec proposes a Godot 4 web client. 0.1.0 uses an HTML/JavaScript client so the game runs anywhere without a build step. The core does not depend on the client, as the spec requires, so a Godot client can replace it later.
+- **10.2 Performance.** See `docs/VALIDATION.md`. No acceleration target is set.
+- **10.3 Saves.** A save holds:
+  - versions and the complete world (zones, POPs, firms, stocks, money, devices with trajectory anchors and thermal states);
+  - the grid with every switch, tap, state of charge and repair;
+  - projects, the event queue, partial-hour accumulators and every random stream's state.
 
-Every cable creates an actual OpenDSS Line using entered length, R1/X1/C1 and ampacity. Each turbine creates a Generator and individual Transformer. Transformer capacity, reactance and 35/66 kV voltage enter power flow. Farm output connects to the common onshore 35 kV bus through a site-transformer equivalent. Separate long export cables and offshore 220 kV platforms are omitted. New storage aggregates at the common bus. Cable and transformer limits curtail the affected farm.
+  Saves live in the player's browser and are validated on load. Continuing a loaded save matches an uninterrupted run within floating-point tolerance: the power-flow engine restarts from a flat start, about 1e-7 relative (`tests/test_world.py`).
+- **10.4 Data.** Climate comes from NASA POWER 2001–2025 at 57.5° N, 18.5° E (`app/island-climatology.json`, with its source and period). Everything else is synthetic. No real facility coordinates, topology or protection settings are reproduced.
 
-Rated power and cut-in/rated/cut-out speeds define turbine curves. Hub height uses a 0.11 power-law shear correction; rotor diameter and coordinates enter within-farm directional wakes. Cross-farm wakes are omitted. The 5 MW template uses NREL anchors; 8/12 MW templates are assumed rather than vendor-certified.
+## 12. Open questions carried forward
 
-Approval freezes parameters and schedule. Commissioning inserts equipment at an interval boundary and settles minimum-SOC precharge. Validation previews current weather and approved farms rather than all lifetime conditions. Existing protection targets the original collectors, harbor, city transformer, grid and BESS; custom cable selectivity, directional coordination and N-1 design are not implemented.
-
-## Continuous Baltic coastal climate
-
-The setting is an unnamed Baltic coastal city. NASA POWER 2001–2020 monthly WS10M, T2M and ALLSKY_SFC_SW_DWN data calibrate coefficients; historical days are not replayed. Raw grid coordinates remain calibration metadata, not a named game location. Data and source metadata are in `app/baltic-coastal-climatology.json`.
-
-With t measured in continuous days from 2030-01-01, seasonal baselines use three Fourier harmonics:
-
-```text
-F(t) = a0 + Σ[k=1..3] { ak cos(2πkt/365) + bk sin(2πkt/365) }
-```
-
-Wind and temperature fit monthly means; irradiance fits logarithms and exponentiates to remain positive. A fixed seed determines random knots. Sixteen lagged white-noise terms weighted by `0.72^k` create persistent weather. Quintic interpolation `w(u)=6u^5−15u^4+10u^3` matches first and second derivatives at knots. Refreshes, repeated operations and midnight do not resample weather.
-
-10 m wind combines seasonal functions, smooth lognormal perturbations, a diurnal term and two-hour gusts. 90 m wind is `wind10 × 9^0.11`. Temperature combines seasonal, weather and cloud-modulated diurnal terms. Direction has an eight-day cycle and shared disturbances; continuity uses circular differences. Clouds vary at daily and four-hour scales. Wave height is the proxy `max(0.25, 0.35+0.025*v10²+0.15*smooth_noise)`, not a measured spectrum or hydrodynamic model.
-
-Solar elevation uses latitude, continuous declination, hour angle and equation of time. Surface irradiance combines positive elevation, seasonal irradiation and smooth cloud perturbations, limited to 0–1100 W/m². It is zero at night and continuous at sunrise/sunset. Fixed CET/UTC+1 avoids daylight-saving jumps. Daily irradiation integrates 96 samples and is not used to reconstruct instantaneous radiation. Daylight means astronomical day length rather than measured sunshine.
-
-Climate is continuous across days, months and years; random processes do not reset annually. Explicit calm/storm/gust modes are operator stress tests and do not alter natural construction weather. Temperature affects heating demand. No solar generators are installed, so irradiance is environmental information only.
-
-Data service: https://power.larc.nasa.gov/docs/services/api/temporal/climatology/
-
-Calibration request: `https://power.larc.nasa.gov/api/temporal/climatology/point?parameters=T2M,WS10M,ALLSKY_SFC_SW_DWN&community=RE&longitude=12.5683&latitude=55.6761&format=JSON&start=2001&end=2020`.
-
-The baseline is gridded data, not offshore mast measurements. Random intensity, correlation time, shear and wave relationships are not site-calibrated; annual results do not establish P50/P90 guarantees.
-
-## Quantities, resources and critical path
-
-The original scheduler approximates work quantities, dedicated resources, dependencies and hourly weather windows. It does not import ORBIT. Productivity is an explicit scenario assumption. Method reference: https://nlrwindsystems.github.io/ORBIT/tutorials/project_manager.html.
-
-- Survey/design: `80 + 8×turbines + 2×cable_km + 2×water_depth_m` hours. Onshore teams work 8 h/day, rounded to full days.
-- Manufacture/delivery: maximum of turbine, transformer, battery and cable lead times. Turbines use `45 + 6×largest_unit_MW + 2×turbines/supply_lines` days, rounded up.
-- Foundation work per unit: `20×(unit_MW/5)^0.65×(1+depth/80) + round-trip transit` hours; fixed foundations cover 5–60 m depth.
-- Lift work per unit: `12 + hub_m/8 + rotor_m/12 + 3×unit_MW + transit` hours.
-- Cable work: `8 + length_km/0.25 + transit` hours. Transit assumes 10 knots and the configured port distance.
-- Foundation weather: 10 m wind ≤14 m/s and waves ≤2.2 m; lifting ≤12 m/s and ≤1.8 m; cabling ≤15 m/s and ≤2.0 m. The same climate function checks hourly work blocks up to 6 h; vessels wait if limits are exceeded.
-- Lifting and cabling can overlap after foundations; onshore electrical work can overlap after delivery. Commissioning waits for all prerequisites. The longest dependency chain is the critical path.
-- Resources are dedicated to each farm rather than shared. Vessel costs include occupied phase days and weather delay: CNY 180,000/day for foundations, 240,000 for installation and 130,000 for cabling.
-
-The commissioning date freezes at approval. The seed defines the full weather sequence, which the scheduler uses in advance; actual forecast uncertainty is omitted. Permits, seabed surveys, supply disruption, shared-vessel queues, accidents, tides and wave-period constraints are omitted.
-
-Base cost is `rated_MW×7,000,000 + cable_km×900,000 + transformer_MVA×180,000 + storage_MW×800,000 + storage_MWh×1,100,000 + 2,000,000`, plus vessel cost. Standard expansions retain their original cost assumptions and use the same scheduler. CNY is a gameplay accounting currency rather than a local project quotation.
+Calibrated economic coefficients, tariff pass-through, the turbine dynamic model, HVAC and HVDC control choices, construction costs and durations, and load calibration against public annual statistics are all open. UI usability with students is still to be tested.

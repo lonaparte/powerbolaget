@@ -1,7 +1,10 @@
 """List project development files while collapsing dependencies, caches and saves."""
+from datetime import date
 from pathlib import Path
+import re
 import sys
 ROOT=Path(__file__).resolve().parents[1]
+VERSION=re.search(r"__version__ = '([^']+)'",(ROOT/'app/__init__.py').read_text(encoding='utf-8')).group(1)
 OUT=ROOT/'DEVELOPMENT-TREE.txt';OUT.touch(exist_ok=True)
 COLLAPSE={'.venv':'Third-party Python environment','.pnpm-store':'Package cache','node_modules':'Third-party npm packages',
           '.git':'Git metadata','.godot':'Godot import cache','data':'Runtime saves','backups':'User-save backups',
@@ -18,10 +21,10 @@ def tree(folder,prefix=''):
         if p.is_dir() and not note:rows.extend(tree(p,prefix+('    ' if last else '│   ')))
     return rows
 project_only='--project-only' in sys.argv
-rows=['Powerbolaget 0.0.1 development tree / 2026-10-12','Project root: .' if project_only else f'Current source directory: {ROOT}',
-      'Lists source, tests, configuration, documentation, screenshots, examples and license evidence.',
-      'Collapses installed dependencies, runtime data and backups; ignores Python, pytest and tool caches.',
-      'Screenshots show the current English interface.','',('Powerbolaget-0.0.1' if project_only else ROOT.name)+'/']
+rows=[f'Powerbolaget {VERSION} development tree / {date.today().isoformat()}','Project root: .' if project_only else f'Current source directory: {ROOT}',
+      'Lists source, tests, configuration, documentation, results and license evidence.',
+      'Collapses installed dependencies and runtime data; ignores Python, pytest and tool caches.',
+      '',(f'Powerbolaget-{VERSION}' if project_only else ROOT.name)+'/']
 rows.extend(tree(ROOT))
 if project_only:
     OUT.write_text('\n'.join(rows)+'\n',encoding='utf-8')
