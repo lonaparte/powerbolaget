@@ -77,17 +77,17 @@ OpenDSS `Circuit.TotalPower` adds up every voltage source. While a grid-forming 
 
 | Measure | Result |
 |---|---|
-| Computation | 1,196 s for 365 days: 134.6 ms per simulated hour on average, 154 ms at the 95th percentile. |
-| Power flow | 1.24 ms median and 1.89 ms at the 95th percentile per solve. No numerical failures. |
-| Memory and saves | Peak 136 MB; a save is 1.5 MB. |
+| Computation | 1,081 s for 365 days: 121.8 ms per simulated hour on average, 133 ms at the 95th percentile. |
+| Power flow | 1.17 ms median and 1.81 ms at the 95th percentile per solve. No numerical failures. |
+| Memory and saves | Peak 113 MB; a save is 1.5 MB. |
 | Money | All accounts sum to 0.000 at the end of every day. |
-| Energy | Load 635.5 GWh; wind 131.2 GWh (20.7 %); import 519.1 GWh; export 0.5 GWh. Peak 126.8 MW on 6 Jan; the lowest daily peak was 62.6 MW. |
-| Supply | 46.8 MWh unserved (0.007 % of load). The largest event was a 20 kV cable fault on the old town's feeder on 25 Feb: switching re-fed the zone within the hour, and about 5 % of it waited 84 hours for the repair. |
-| Population | 55,300 → 54,945: 509 births, 629 deaths, 1,428 immigrants and 1,663 emigrants. Region Gotland's forecast for 2025–2035, scaled to the same population, has about 2,300 people moving in and 2,180 moving out each year, so the model's gross flows are about two-thirds of that. |
-| Visitors | Up to 16,600 at once. Lodging was full for 58 days in high summer. |
-| Labour | 1,579 unemployed at the start (5.1 %), 3,632 in May, 417 in late September and 2,204 at the end of the year (7.2 %). |
+| Energy | Load 637.8 GWh; wind 116.7 GWh (18.3 %); import 535.9 GWh; export 0.4 GWh. Peak 133.0 MW on 6 Jan; the lowest daily peak was 63.6 MW. |
+| Supply | 26.8 MWh unserved (0.004 % of load). The largest event was an ice-load fault on 17 Dec on the single-circuit feeder to Östernäs. The zone was out for two hours until switching re-fed it; then 34 % of it waited five more hours for the repair. |
+| Population | 55,300 → 54,985: 525 births, 626 deaths, 1,418 immigrants and 1,632 emigrants. Region Gotland's forecast for 2025–2035, scaled to the same population, has about 2,300 people moving in and 2,180 moving out each year, so the model's gross flows are about two-thirds of that. |
+| Visitors | Up to 16,600 at once. Lodging was full for 61 days in high summer. |
+| Labour | 1,579 unemployed at the start (5.1 %), 3,623 in May, 359 in September and 2,187 at the end of the year (7.1 %). |
 | Firms | On 1 Sep an investor decided to build an 8 MW data centre, with a grid connection; firms went from 69 to 70. |
-| Powerbolaget | Cash went from 400 to 546 MSEK. |
+| Powerbolaget | Cash went from 400 to 551 MSEK. |
 
 The first year run found two faults in the model, both now fixed:
 - **Out-migration was missing.** In that run 1,325 people moved to the island but only 71 left, so unemployment drifted upward. Retirees were also counted as unemployed in the migration step. Off-island moves now have a base rate for life reasons, 40 % of school leavers leave to study or work, and immigration falls faster when unemployment is above 5 %.
@@ -98,4 +98,5 @@ The first year run found two faults in the model, both now fixed:
 - No comparison against measured Gotland load, wind output or economic statistics. Every coefficient outside the NASA POWER climatology is an assumption.
 - No dynamic (RMS or EMT) validation; the model has no dynamics.
 - Unemployment is seasonal, but it peaks in May instead of in winter. The seasonal labour pattern is not calibrated.
+- Turbine output: the existing turbines reach a capacity factor of about 19 % after wakes and outages. Free-stream hub winds average 6.5–6.9 m/s, because the NASA grid cell is mostly sea and its wind increases little between 10 m and 50 m. Real onshore turbines on Gotland probably do somewhat better; this has not been checked against production data.
 - Browser tests run in Chromium only.
