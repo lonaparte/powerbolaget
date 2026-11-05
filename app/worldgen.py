@@ -32,6 +32,8 @@ def generate(world):
                                 start_residents=residents, provenance='synthetic'))
     world.zone_by_id = {z['id']: z for z in world.zones}
     build_grid(world)
+    from .protection import add_ties
+    add_ties(world)
     E.create_firms(world)
     for z in world.zones:
         did = 'res_'+z['id']

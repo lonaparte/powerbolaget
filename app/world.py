@@ -29,6 +29,7 @@ from . import finance as F
 from . import generation as O
 from . import history as H
 from .exchange import message
+from . import protection as P
 from .calendar import DAY, HOUR, is_rest_day, label, month_index, parts, stamp
 from .events import EventQueue
 from .ledger import Ledger
@@ -118,6 +119,7 @@ class World:
         self.contracts = s.get('contracts', {})
         self.price_observations = s.get('price_observations', dict(sum=0., hours=0))
         self.grid.setdefault('oil',{})
+        P.add_ties(self)
         self.events.cancel(lambda e: e['kind'] == 'interconnector')
         legacy = self.projects.get('tso_hvac')
         if legacy and legacy['status'] == 'building':
@@ -523,6 +525,8 @@ class World:
                 L.command(d, t, ev['on'])
         elif kind == 'fault':
             self.fault(ev)
+        elif kind == 'relay_trip':
+            self.clear_fault(ev)
         elif kind == 'restore':
             self.restore(ev)
         elif kind == 'commission':
@@ -547,20 +551,24 @@ class World:
             br = self.grid['branches'].get(ev['id'])
             if not br or not G.in_service(br) or br['repair_until'] is not None:
                 return
-            current = self.fault_current(br)
+            try:
+                study=P.study(self,br,ev.get('resistance_ohm',.5))
+            except Exception as exc:
+                self.perf['failures']+=1
+                self.log('numerical',f'Fault event not applied: short-circuit study failed ({exc})',None,branch=br['id'])
+                return
             permanent = not (br['kind'] == 'line' and br['type'].startswith('OHL')
                              and self.streams['faults'].random() < N.TRANSIENT_SHARE.get(br['type'], 0))
-            note = f" (fault current {current/1000:.1f} kA)" if current else ''
-            self.trip_branch(br['id'], t, f"{ev['cause']}{note}", permanent=permanent)
-            if not permanent:
-                self.events.push(t+1/60, 'restore', 'restore', id=br['id'], reason='auto-reclose')
-            else:
-                kind = br['type'] if br['kind'] == 'line' else 'transformer'
-                br['repair_until'] = t+N.repair_minutes(self, kind)
-                self.events.push(br['repair_until'], 'restore', 'restore', id=br['id'], reason='repair completed')
-                plan = N.sectionalise(self, br)
-                if plan and plan[0] < br['repair_until']-t:
-                    self.events.push(t+plan[0], 'restore', 'restore', id=br['id'], reason='sectionalised', share=round(plan[1], 3))
+            permanent=ev.get('permanent',permanent)
+            selected=study['selected']
+            br['protection_study']=study
+            if selected is None:
+                self.log('protection',f"Fault current {study['current_a']:.0f} A is below all enabled pickups; automatic overcurrent clearing unavailable",None,branch=br['id'])
+                return
+            br['active_fault']=dict(bus=study['fault_bus'],r=study['resistance_ohm'],since=t)
+            self.events.push(t+selected['seconds']/60,'relay_trip','protection',id=br['id'],
+                             relay=selected['branch'],permanent=permanent,cause=ev['cause'])
+            self.log('fault',f"{ev['cause']}: {study['current_a']/1000:.2f} kA; {selected['role']} {selected['branch']} clearing in {selected['seconds']:.3f} s",None,branch=br['id'])
         elif target == 'turbine':
             tb = self.grid['turbines'].get(ev['id'])
             if not tb or tb['status'] != 'ok':
@@ -605,6 +613,26 @@ class World:
         except Exception:
             return 0.
 
+    def clear_fault(self,ev):
+        t=ev['time']
+        br=self.grid['branches'][ev['id']]
+        if not br.get('active_fault'):
+            return
+        br.pop('active_fault',None)
+        self.trip_branch(ev['relay'],t,ev['cause']+' · overcurrent relay',permanent=ev['permanent'])
+        if ev['relay']!=br['id']:
+            self.trip_branch(br['id'],t,'faulted segment isolated following backup trip',permanent=ev['permanent'])
+            self.events.push(t+10,'restore','restore',id=ev['relay'],reason='backup reset after fault isolation')
+        if not ev['permanent']:
+            self.events.push(t+1/60,'restore','restore',id=br['id'],reason='auto-reclose')
+        else:
+            kind=br['type'] if br['kind']=='line' else 'transformer'
+            br['repair_until']=t+N.repair_minutes(self,kind)
+            self.events.push(br['repair_until'],'restore','restore',id=br['id'],reason='repair completed')
+            plan=N.sectionalise(self,br)
+            if plan and plan[0]<br['repair_until']-t:
+                self.events.push(t+plan[0],'restore','restore',id=br['id'],reason='sectionalised')
+
     def trip_branch(self, bid, t, cause, permanent):
         br = self.grid['branches'][bid]
         was = set(self.network.energized)
@@ -640,6 +668,10 @@ class World:
             name = br.get('name', br['id'])
             if ev['reason'] == 'repair completed':
                 br['repair_until'] = None
+                tie=self.grid['branches'].get(br.get('transfer_tie'))
+                if tie and tie['closed']:
+                    tie['closed']=False
+                    self.network.switch(tie['id'])
                 if br.get('section_out') is not None:
                     br['section_out'] = None
                     if not br['tripped']:
@@ -649,13 +681,9 @@ class World:
             elif ev['reason'] == 'sectionalised':
                 if not br['tripped'] or not br['closed'] or br['repair_until'] is None:
                     return
-                br['section_out'], br['tripped'] = ev['share'], False
-                self.network.switch(br['id'])
+                ok,reason=P.transfer(self,br,t)
                 zone = self.grid['buses'][br['b']].get('zone')
-                who = self.zone_by_id[zone]['name'] if zone in self.zone_by_id else self.grid['buses'][br['b']]['name']
-                left = (f"{ev['share']:.0%} of customers in {who} wait for the repair (until {label(br['repair_until'])})"
-                        if ev['share'] >= .005 else f"every customer in {who} is back; repair continues until {label(br['repair_until'])}")
-                self.log('restore', f"{name}: faulted section isolated and supply switched over; {left}", zone, branch=br['id'])
+                self.log('restore',f"{name}: {'alternative feeder closed' if ok else 'transfer rejected'}; {reason}. Faulted branch remains isolated.",zone,branch=br['id'],tie=br.get('transfer_tie'))
                 return
             if (br['repair_until'] is not None and br.get('section_out') is None) or not br['tripped']:
                 return

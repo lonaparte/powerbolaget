@@ -20,10 +20,6 @@ WAKE_K = .075
 FAULT_RATE = {'OHL110': 2.2, 'OHL20': 6.0, 'CAB110': .6, 'CAB20': 1.2, 'CAB33': 1.2, 'CAB220': .15, 'transformer': .02,
               'turbine_minor': 2.5, 'turbine_major': .15, 'pole': 1.0, 'storage': .4}
 TRANSIENT_SHARE = {'OHL110': .75, 'OHL20': .65}
-# After a permanent fault on a 20 kV feeder the distribution operator isolates the faulted section and re-feeds
-# the rest by switching (ring or neighbouring feeder). By number of circuits: minutes until switching is done,
-# and the share of the feeder's customers left on the faulted section until repair (assumptions).
-SECTIONALISE = {1: ((45, 150), (.15, .35)), 2: ((15, 45), (0., .08))}
 REPAIR_HOURS = {'OHL110': (6, 30), 'OHL20': (3, 12), 'CAB110': (72, 400), 'CAB20': (24, 120), 'CAB33': (24, 150), 'CAB220': (240, 1500),
                 'transformer': (120, 720), 'turbine_minor': (8, 60), 'turbine_major': (200, 900), 'pole': (6, 72),
                 'storage': (24, 240)}
@@ -181,13 +177,12 @@ def dispatch(world, t, requests, avail):
     load = 0.
     by_class = {}
     # Customers on an isolated faulted feeder section wait for the repair crew.
-    cut = {br['b']: br['section_out'] for br in grid['branches'].values() if br.get('section_out') and G.in_service(br)}
     for did, (p, q) in requests.items():
         d = devices[did]
         if d['bus'] not in energized:
             served[did] = 0.
             continue
-        served[did] = 1.-cut.get(d['bus'], 0.) if d['kind'] != 'equipment' else 1.
+        served[did] = 1.
         load += p*served[did]
         by_class.setdefault(d['priority'], []).append(did)
     wind = {tid: p for tid, p in avail.items() if grid['turbines'][tid]['bus_lv'] in energized}
@@ -371,12 +366,11 @@ def fault_cause(br, w):
 
 
 def sectionalise(world, br):
-    """Switching plan after a permanent feeder fault: (minutes, share left off) or None if it cannot be re-fed."""
-    if not br.get('restorable'):
+    """Transfer delay for a real normally-open alternative feeder, subject to a flow study."""
+    tie=world.grid['branches'].get(br.get('transfer_tie'))
+    if not tie or tie['a'] not in world.network.energized or tie.get('retired') or tie['repair_until'] is not None:
         return None
-    (t0, t1), (s0, s1) = SECTIONALISE[min(2, br.get('circuits', 1))]
-    rng = world.streams['faults']
-    return t0+(t1-t0)*rng.random(), s0+(s1-s0)*rng.random()
+    return br.get('switching_minutes',45.),0.
 
 
 def repair_minutes(world, kind):

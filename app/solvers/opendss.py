@@ -163,4 +163,5 @@ class Backend:
         if not d.Solution.Converged(): raise SolverError('Short-circuit calculation did not converge.')
         d.Circuit.SetActiveElement('fault.study')
         current = max(d.CktElement.CurrentsMagAng()[::2])
+        self.fault_branch_currents={k:v[4] for k,v in self.results().branches.items()}
         return current, self.bus_voltage_pu(bus)

@@ -211,6 +211,17 @@ Three views (island, grid, economy), map layers, a context inspector, parcel det
 Calibrated economic coefficients, tariff pass-through, the turbine dynamic model, HVAC and HVDC control choices, construction costs and durations, and load calibration against public annual statistics are all open. UI usability with students is still to be tested.
 # Confirmed retail and private finance rules
 
+Fault studies use the actual switched network and enabled forming sources in a separate solver
+context. IEC 60255 standard-inverse overcurrent relays use measured branch fault current, 1.25×
+continuous-current pickup, TMS 0.08, 60 ms breaker time and 300 ms upstream grading per zone.
+Relay-disabled and below-pickup cases are explicit. Fault inception voltage/frequency transients
+are added by the subsequent RMS event integration, not by the short-circuit study alone.
+
+Normally-open physical 20 kV ties replace random served-fraction restoration. A permanent fault
+stays isolated; after a 45-minute switching delay the alternative feeder is tested with a separate
+AC power flow. Transfers below 0.90 pu or above the tie's current rating are rejected. Repair
+restores the normal radial arrangement. The islet sea feeder still has no alternative path.
+
 The persisted teaching archive retains 168 hourly rows and 30 daily rows per object, 1,440 minute
 samples for each of up to eight selected electrical objects, and eight event windows. These bounds
 are shown in the export dialog. Device/turbine energy is integrated MWh; other hourly engineering

@@ -44,8 +44,9 @@ def add_line(grid, bid, a, b, ltype, circuits=1, km=None, **extra):
     km = round(km if km is not None else length(grid, a, b), 3)
     amps = LINE_TYPES[ltype][6]*circuits
     kv = grid['buses'][a]['kv']
+    closed=extra.pop('closed',True)
     grid['branches'][bid] = dict(id=bid, kind='line', type=ltype, a=a, b=b, km=km, circuits=circuits, kv=kv,
-                                 amps=amps, mva=round(3**.5*kv*amps/1000, 2), closed=True, tripped=False,
+                                 amps=amps, mva=round(3**.5*kv*amps/1000, 2), closed=closed, tripped=False,
                                  repair_until=None, fault=None, **extra)
     return bid
 
@@ -59,7 +60,7 @@ def add_transformer(grid, bid, hv, lv, ttype, mva, **extra):
 def in_service(branch):
     """Closed, not tripped and not waiting for repair. A sectionalised feeder runs while its faulted section is repaired."""
     return (branch['closed'] and not branch['tripped'] and not branch.get('planned') and not branch.get('retired')
-            and (branch['repair_until'] is None or branch.get('section_out') is not None))
+            and branch['repair_until'] is None)
 
 
 def hvac_active(grid):

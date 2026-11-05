@@ -91,7 +91,7 @@ def test_fault_protection_and_repair_restore_supply():
     w = World(seed=4)
     w.advance(5)
     t = w.minute+.25
-    w.events.push(t, 'fault', 'protection', target='branch', id='f_z18', cause='test')
+    w.events.push(t, 'fault', 'protection', target='branch', id='f_z18', cause='test',permanent=True)
     w.advance(1)
     br = w.grid['branches']['f_z18']
     assert br['tripped'] and 'z18' not in w.network.energized
@@ -113,15 +113,15 @@ def test_a_feeder_fault_is_sectionalised_before_the_repair():
     br = w.grid['branches']['f_z06']
     assert br['tripped'] and w.devices['res_z06']['served'] == 0
     w.advance(151)
-    assert not br['tripped'] and br['repair_until'] is not None and 'z06' in w.network.energized
-    share = br['section_out']
-    assert .15 <= share <= .35
-    assert w.devices['res_z06']['served'] == pytest.approx(1-share)
+    assert br['tripped'] and br['repair_until'] is not None and 'z06' in w.network.energized
+    assert w.grid['branches'][br['transfer_tie']]['closed']
+    assert w.devices['res_z06']['served'] == 1.
     w.events.cancel(lambda e: e.get('id') == 'f_z06' and e.get('reason') == 'repair completed')
     br['repair_until'] = w.minute+5
     w.events.push(br['repair_until'], 'restore', 'restore', id='f_z06', reason='repair completed')
     w.advance(7)
-    assert br['section_out'] is None and br['repair_until'] is None and w.devices['res_z06']['served'] == 1
+    assert br['repair_until'] is None and w.devices['res_z06']['served'] == 1
+    assert not w.grid['branches'][br['transfer_tie']]['closed']
     # The sea cable to the islet has no other path: its customers wait for the repair.
     w.events.push(w.minute+.25, 'fault', 'protection', target='branch', id='f_z14', cause='test')
     w.advance(200)

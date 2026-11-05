@@ -65,3 +65,7 @@ without a public source are assumptions and must be visible as such in the model
   exports with units and retention. Added a browser workflow for engineering, tariff editing, minute
   recording and CSV download. Validation: 46 Python tests and 5 browser workflows passed. Event
   storage/export is ready; the actual RMS event producer belongs to the next batch.
+- Batch 5a: fault studies at the receiving end on the actual switched network, graded IEC inverse
+  overcurrent pickups and primary/backup selection with timed clearing; physical normally-open
+  feeder ties, transfer feasibility and normal-topology restoration replace random load fractions.
+  Validation: existing 46 Python tests plus 3 new protection checks passed; browser results below.
