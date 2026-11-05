@@ -1,3 +1,4 @@
+import copy
 import json
 import pytest
 from app.world import World
@@ -46,3 +47,14 @@ def test_legacy_save_gets_public_water_and_a_new_goods_accounting_epoch():
     loaded.advance(2)
     assert len(loaded.water)==len(loaded.zones)
     assert max(abs(r['residual']) for r in M.report(loaded).values())<1e-6
+
+
+def test_split_pop_cohorts_age_like_canonical_cohorts():
+    w=World(seed=3)
+    split=copy.deepcopy(w.pops['z01_services'])
+    split.update(id='split_services',count=100_000,employed=0,inactive=0)
+    w.pops[split['id']]=split
+    before=w.pops['z01_retired']['count']
+    S.age_split_cohorts(w,0,w.streams['society'])
+    assert split['count']<100_000
+    assert w.pops['z01_retired']['count']>before

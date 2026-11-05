@@ -19,7 +19,18 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from app import __version__  # noqa: E402
 from app.calendar import label  # noqa: E402
+from app.saves import validate  # noqa: E402
 from app.world import World  # noqa: E402
+
+
+def write_checkpoint(path,w,days):
+    temporary=path.with_name(path.name+'.tmp')
+    temporary.write_text(json.dumps(w.state(),separators=(',',':')),encoding='utf-8')
+    temporary.replace(path)
+    progress=path.with_name(path.name+'.progress.json')
+    temporary=progress.with_name(progress.name+'.tmp')
+    temporary.write_text(json.dumps(days,separators=(',',':')),encoding='utf-8')
+    temporary.replace(progress)
 
 
 def main():
@@ -28,13 +39,21 @@ def main():
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--output', type=Path)
     ap.add_argument('--checkpoint',type=Path,help='write the final resumable world for inspection')
+    ap.add_argument('--resume',type=Path,help='continue from a benchmark checkpoint')
+    ap.add_argument('--checkpoint-every',type=int,default=10)
     a = ap.parse_args()
     t0 = time.perf_counter()
-    w = World(seed=a.seed)
-    days = []
-    for d in range(a.days):
+    if a.resume:
+        w=World(state=validate(json.loads(a.resume.read_text(encoding='utf-8'))))
+        progress=a.resume.with_name(a.resume.name+'.progress.json')
+        days=json.loads(progress.read_text(encoding='utf-8')) if progress.exists() else []
+        if len(days)!=len(w.history_day):
+            raise ValueError('Benchmark progress does not match the world checkpoint.')
+    else:
+        w=World(seed=a.seed);days=[]
+    for d in range(len(days),a.days):
         c0 = time.process_time()
-        w.advance(1441 if d == 0 else 1440)   # the day is settled at the next midnight
+        w.advance(1441 if w.minute == 0 else 1440)   # the day is settled at the next midnight
         cpu = time.process_time()-c0
         h = w.history_day[-1]
         st = w.society_stats
@@ -52,12 +71,14 @@ def main():
         if (d+1) % 10 == 0:
             print(f"day {d+1}: {days[-1]['ms_per_sim_hour']} ms/sim-h, residents {h['residents']}, tourists {h['tourists']}, "
                   f"unserved {h['unserved_mwh']} MWh, pb {days[-1]['pb_cash_msek']} MSEK", flush=True)
+        if a.checkpoint and a.checkpoint_every>0 and (d+1)%a.checkpoint_every==0:
+            write_checkpoint(a.checkpoint,w,days)
     solves = sorted(w.perf['solve_ms'])
     q = lambda xs, f: round(xs[min(len(xs)-1, int(f*len(xs)))], 3) if xs else None
     report = dict(
         git_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         processor_model=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name')),platform.machine()),
-        version=__version__, seed=a.seed, days=a.days, python=platform.python_version(), machine=platform.machine(),
+        version=__version__, seed=w.seed, days=a.days, python=platform.python_version(), machine=platform.machine(),
         processor=platform.processor() or platform.machine(), wall_s=round(time.perf_counter()-t0, 1),
         ms_per_sim_hour=dict(mean=round(statistics.mean(x['ms_per_sim_hour'] for x in days), 1),
                              p95=q(sorted(x['ms_per_sim_hour'] for x in days), .95)),
@@ -73,7 +94,7 @@ def main():
         a.output.write_text(json.dumps(report, indent=1), encoding='utf-8')
     if a.checkpoint:
         a.checkpoint.parent.mkdir(parents=True,exist_ok=True)
-        a.checkpoint.write_text(json.dumps(w.state(),separators=(',',':')),encoding='utf-8')
+        write_checkpoint(a.checkpoint,w,days)
 
 
 if __name__ == '__main__':

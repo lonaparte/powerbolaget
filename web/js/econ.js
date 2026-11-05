@@ -4,15 +4,17 @@
 PB.econ = (() => {
   const el = PB.$('econ');
   const TABS = [['overview', 'OVERVIEW'], ['zones', 'REGIONS'], ['pops', 'POPS'], ['firms', 'FIRMS'], ['markets', 'MARKETS'], ['finance', 'FINANCE'], ['demography', 'DEMOGRAPHY']];
-  let tab = 'overview', data = {}, sort = {}, filter = '';
+  let tab = 'overview', data = {}, sort = {}, filter = '',page=0;
   function table(cols, rows, clickCol = 0, opts = {}) {
     const s = sort[tab] || {col: -1, dir: 1};
     let body = rows.filter(r => !filter || r.join(' ').toLowerCase().includes(filter.toLowerCase()));
     if (s.col >= 0) body = [...body].sort((a, b) => (typeof a[s.col] === 'number' && typeof b[s.col] === 'number' ? a[s.col] - b[s.col] : String(a[s.col]).localeCompare(String(b[s.col]))) * s.dir);
+    const pages=Math.max(1,Math.ceil(body.length/100));page=PB.clamp(page,0,pages-1);const count=body.length;
+    body=body.slice(page*100,(page+1)*100);
     const fmt = v => typeof v === 'number' ? (Math.abs(v) < 1 && v !== 0 ? PB.fmt(v, 3) : Number.isInteger(v) ? PB.int(v) : PB.fmt(v, 1)) : PB.esc(v ?? '—');
     const hide = opts.hide || [];
     return `<div class="table-wrap"><table><thead><tr>${cols.map((c, i) => hide.includes(i) ? '' : `<th data-sort="${i}" class="${i <= 1 ? 'l' : ''}">${PB.esc(c)}${s.col === i ? (s.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
-      <tbody>${body.map(r => `<tr data-goto="${PB.esc(r[clickCol])}">${r.map((v, i) => hide.includes(i) ? '' : `<td class="${i <= 1 ? 'l' : ''}">${fmt(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      <tbody>${body.map(r => `<tr data-goto="${PB.esc(r[clickCol])}">${r.map((v, i) => hide.includes(i) ? '' : `<td class="${i <= 1 ? 'l' : ''}">${fmt(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${pages>1?`<div class="actions"><button class="button" data-page="${page-1}" ${page===0?'disabled':''}>Previous</button><span>${page+1} / ${pages} · ${PB.int(count)} rows</span><button class="button" data-page="${page+1}" ${page===pages-1?'disabled':''}>Next</button></div>`:''}`;
   }
   async function load() {
     const name = tab === 'overview' ? 'history' : tab;
@@ -34,7 +36,7 @@ PB.econ = (() => {
     else if (tab === 'demography') html += demography(d);
     el.innerHTML = html;
     el.querySelectorAll('canvas[data-series]').forEach(c => drawSeries(c));
-    const f = PB.$('efilter'); if (f) { f.oninput = () => { filter = f.value; const pos = f.selectionStart; render(); const g = PB.$('efilter'); g.focus(); g.setSelectionRange(pos, pos); }; }
+    const f = PB.$('efilter'); if (f) { f.oninput = () => { filter = f.value;page=0; const pos = f.selectionStart; render(); const g = PB.$('efilter'); g.focus(); g.setSelectionRange(pos, pos); }; }
   }
   let hist = null;
   function overview(d) {
@@ -59,6 +61,11 @@ PB.econ = (() => {
   }
   function finance(d) {
     const top = d.totals.slice(0, 40);
+    const c=d.conservation,goods=c?Object.entries(c.goods||{}).map(([g,x])=>[g,x.unit,x.stock,x.expected,x.residual]):[];
+    const maxWater=c?Math.max(0,...Object.values(c.water||{}).map(Math.abs)):null;
+    const checks=c?`<h3>CONSERVATION CHECKS · DAY ${Math.floor(c.t/1440)}</h3>
+      <div class="kv"><span>Money-ledger residual</span><span>${Number(c.money).toExponential(3)} SEK</span><span>Largest goods residual</span><span>${Math.max(0,...goods.map(x=>Math.abs(x[4]))).toExponential(3)}</span><span>Largest water residual</span><span>${maxWater.toExponential(3)} m³</span></div>
+      ${table(['good','unit','actual stock','identity expected','residual'],goods,0)}`:'<p class="small muted">Conservation checks appear after the first completed day.</p>';
     return `<div class="kpis"><div class="kpi"><small>Powerbolaget cash</small><b>${PB.msek(d.pb_cash / 1e6)}</b></div><div class="kpi"><small>External financing</small><b>${PB.msek(d.financing / 1e6)}</b></div>
       <div class="kpi"><small>Region (public sector)</small><b>${PB.msek(d.region / 1e6)}</b></div></div>
       <h3>RETAIL CONTRACT OFFERS · SEK/KWH</h3>
@@ -70,6 +77,7 @@ PB.econ = (() => {
       <h3>PRIVATE COMPANY CREDIT · SEK</h3>${table(['id','company','status','limit','debt','interest paid','repaid','bank losses'], (d.loans || []).map(x => [x.id,x.name,x.status,x.limit,x.debt,x.interest,x.repaid,x.losses]), 0, {hide:[0]})}
       <h3>MONEY MOVED SINCE FE 1, BY CATEGORY</h3>${table(['category', 'SEK'], top.map(([k, v]) => [k, v]), 0)}
       <h3>LATEST LARGE PAYMENTS</h3>${table(['time', 'payer', 'payee', 'SEK', 'category', 'good', 'qty'], d.journal.slice().reverse().map(j => [j[0], j[1], j[2], j[3], j[4], j[5] || '', j[6] ?? '']), 0)}
+      ${checks}
       <p class="small muted">Every payment has a payer and payee. Powerbolaget investment shortfalls use explicit external financing. Private firms have finite credit; interest, repayment and liquidation losses are recorded separately.</p>`;
   }
   function demography(d) {
@@ -78,9 +86,10 @@ PB.econ = (() => {
       <p class="small muted">End = start + births − deaths + moved in − moved out. Migration follows jobs, wages, housing, commuting, amenities and outages (logit choice), with inertia.</p>`;
   }
   el.addEventListener('click', ev => {
-    const t = ev.target.closest('[data-tab],[data-sort],tr[data-goto]'); if (!t) return;
-    if (t.dataset.tab) { tab = t.dataset.tab; filter = ''; render(); load(); return; }
-    if (t.dataset.sort != null) { const i = Number(t.dataset.sort), s = sort[tab] || {col: -1, dir: 1}; sort[tab] = {col: i, dir: s.col === i ? -s.dir : -1}; render(); return; }
+    const t = ev.target.closest('[data-tab],[data-sort],[data-page],tr[data-goto]'); if (!t) return;
+    if(t.dataset.page!=null){page=Number(t.dataset.page);render();return;}
+    if (t.dataset.tab) { tab = t.dataset.tab; filter = '';page=0; render(); load(); return; }
+    if (t.dataset.sort != null) { const i = Number(t.dataset.sort), s = sort[tab] || {col: -1, dir: 1}; sort[tab] = {col: i, dir: s.col === i ? -s.dir : -1};page=0; render(); return; }
     if (t.dataset.goto) { const id = t.dataset.goto; if (['zones', 'firms', 'pops'].includes(tab)) PB.select(id); }
   });
   el.addEventListener('submit', async ev => {

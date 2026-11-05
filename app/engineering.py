@@ -11,6 +11,29 @@ from .construction import BuildError, winter_factor
 LINK_LIMITS = dict(HVDC=640., HVAC=440.)
 
 
+def impact(world,plan):
+    """Read-only commissioning sensitivity at the current time/weather, not a future forecast."""
+    from copy import deepcopy
+    from .world import World
+    from . import construction as C
+    state=world.state()
+    state.update(archive={},entity_hist={},history_hour=[],history_day=[],logbook=[],commands=[],messages={},command_receipts={})
+    clone=World(state=deepcopy(state),backend=world.backend)
+    clone.solve_now(float(clone.minute))
+    def indicators():
+        f=clone.flows or {}
+        values=[v for b,v in f.get('vm',{}).items() if b in clone.network.energized and clone.grid['buses'][b]['kind']!='mainland']
+        return dict(served_mw=sum(p*s for p,s in f.get('dev',{}).values()),
+                    losses_mw=f.get('losses',0.),minimum_voltage_pu=min(values,default=0.),
+                    overloaded=[b for b,l in f.get('loading',{}).items() if l>1.],converged=clone.physics_valid)
+    before=indicators()
+    project=C.start(clone,deepcopy(plan))
+    C.commission(clone,project['id'])
+    clone.solve_now(float(clone.minute))
+    return dict(minute=world.minute,assumption='Immediate commissioning with current weather and demand; not a future forecast',
+                before=before,after=indicators())
+
+
 def bus(world, ref, side='hv_bus'):
     bid = world.substations.get(ref, {}).get(side, ref)
     if bid not in world.grid['buses']:

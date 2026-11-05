@@ -4,9 +4,18 @@ Hourly device energy is integrated actual energy; other object values are end-of
 Daily energy fields sum and state fields average snapshots. Minute recording is opt-in (8 objects).
 Retention is explicit in every export; it is not an unlimited telemetry database.
 """
+import base64
 import csv
+import hashlib
 import io
+import json
+import zlib
 from collections import deque
+
+ARCHIVE_ENCODING='zlib+base64'
+ARCHIVE_SCHEMA='powerbolaget.archive/1'
+ARCHIVE_COMPRESS_AT=256_000
+MAX_ARCHIVE_BYTES=64_000_000
 
 FIELDS={
  'global': [('requested_mwh','MWh'),('served_mwh','MWh'),('wind_mwh','MWh'),('oil_mwh','MWh'),('loss_mwh','MWh')],
@@ -22,9 +31,51 @@ FIELDS={
 MINUTE_FIELDS=[('p_mw','MW'),('q_mvar','Mvar'),('voltage_pu','pu'),('loading','pu'),('soc','pu')]
 
 
+def pack(state,threshold=ARCHIVE_COMPRESS_AT):
+    """Losslessly compact the bounded archive inside browser saves; exports stay plain JSON/CSV."""
+    raw=json.dumps(state,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
+    if len(raw)<threshold:
+        return state
+    return dict(encoding=ARCHIVE_ENCODING,schema=ARCHIVE_SCHEMA,uncompressed_bytes=len(raw),
+                sha256=hashlib.sha256(raw).hexdigest(),data=base64.b64encode(zlib.compress(raw,6)).decode('ascii'))
+
+
+def unpack(state):
+    if not isinstance(state,dict) or state.get('encoding') is None:
+        return state
+    if state.get('encoding')!=ARCHIVE_ENCODING or state.get('schema')!=ARCHIVE_SCHEMA:
+        raise ValueError('Unknown history archive encoding.')
+    size=state.get('uncompressed_bytes')
+    if not isinstance(size,int) or isinstance(size,bool) or not 0<=size<=MAX_ARCHIVE_BYTES:
+        raise ValueError('History archive is too large.')
+    try:
+        compressed=base64.b64decode(state.get('data',''),validate=True)
+        decoder=zlib.decompressobj()
+        raw=decoder.decompress(compressed,MAX_ARCHIVE_BYTES+1)
+        if len(raw)>MAX_ARCHIVE_BYTES or decoder.unconsumed_tail:
+            raise ValueError('History archive is too large.')
+        remaining=MAX_ARCHIVE_BYTES+1-len(raw)
+        if remaining>0:
+            raw+=decoder.flush(remaining)
+        if len(raw)>MAX_ARCHIVE_BYTES or not decoder.eof or decoder.unused_data or len(raw)!=size:
+            raise ValueError('Invalid history archive stream.')
+    except (ValueError,zlib.error) as exc:
+        raise ValueError('Invalid compressed history archive.') from exc
+    digest=state.get('sha256')
+    if not isinstance(digest,str) or hashlib.sha256(raw).hexdigest()!=digest:
+        raise ValueError('History archive checksum failed.')
+    try:
+        plain=json.loads(raw)
+    except (UnicodeDecodeError,json.JSONDecodeError) as exc:
+        raise ValueError('Invalid history archive JSON.') from exc
+    if not isinstance(plain,dict):
+        raise ValueError('Invalid history archive data.')
+    return plain
+
+
 class Archive:
     def __init__(self,state=None):
-        s=state or {}
+        s=unpack(state or {})
         self.kinds=s.get('kinds',{})
         self.hours={k:deque(v,maxlen=168) for k,v in s.get('hours',{}).items()}
         self.days={k:deque(v,maxlen=30) for k,v in s.get('days',{}).items()}
@@ -35,9 +86,10 @@ class Archive:
         self.invalid_intervals=s.get('invalid_intervals',[])
 
     def state(self):
-        return dict(kinds=self.kinds,hours={k:list(v) for k,v in self.hours.items()},
-                    days={k:list(v) for k,v in self.days.items()},minutes={k:list(v) for k,v in self.minutes.items()},
-                    selected=self.selected,waveforms=list(self.waveforms),day_acc=self.day_acc,invalid_intervals=self.invalid_intervals)
+        plain=dict(kinds=self.kinds,hours={k:list(v) for k,v in self.hours.items()},
+                   days={k:list(v) for k,v in self.days.items()},minutes={k:list(v) for k,v in self.minutes.items()},
+                   selected=self.selected,waveforms=list(self.waveforms),day_acc=self.day_acc,invalid_intervals=self.invalid_intervals)
+        return pack(plain)
 
     def invalid(self,start,end):
         if self.invalid_intervals and abs(self.invalid_intervals[-1][1]-start)<1e-8:

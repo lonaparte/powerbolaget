@@ -24,12 +24,12 @@ The source specification is a design input; the decisions below take precedence.
 Each batch is checked and committed separately on `codex/development` and pushed to origin.
 Completion means executable behavior and validation, not just documentation or a UI placeholder.
 
-- [ ] Production labor/capacity, inventory conservation, elapsed-time protection and request deduplication.
+- [x] Production labor/capacity, inventory conservation, elapsed-time protection and request deduplication.
 - [x] Contract-consistent planning, retail policy and bounded private finance/exit.
-- [ ] Editable engineering, oil backup, player-controlled links and asset lifecycle.
-- [ ] Aggregated electrical dynamics, P/Q limits and fault/protection/restoration behavior.
+- [x] Editable engineering, oil backup, player-controlled links and asset lifecycle.
+- [x] Aggregated electrical dynamics, P/Q limits and fault/protection/restoration behavior.
 - [x] Versioned module exchanges, persistent layered history and engineering exports.
-- [ ] Client controls, layers, object analysis and event inspection.
+- [x] Client controls, layers, object analysis and event inspection.
 - [ ] Calibration, conservation/reference checks, sensitivity and scale measurements.
 
 ## Validation policy
@@ -88,3 +88,10 @@ without a public source are assumptions and must be visible as such in the model
   Validation: 12 affected protocol/save/dynamic tests passed; timing/wake regression checks below.
   First autonomous 30-day trace: zero numerical failures, mean 211.5 ms CPU/simulated hour,
   82.5 MiB peak RSS, 6,079.8 KiB JSON save. These are measurements on this environment, not targets.
+- Batch 8: read-only current-condition commissioning studies and asset-work quotations; routed-line
+  selection, active/reactive/loss grid layers, frequency/quality display and paged large POP tables;
+  stable island load restoration; ageing for split POP cohorts; checksummed, size-limited compressed
+  history in saves; resumable benchmarks and synthetic 10,000-POP/600-turbine scale fixtures.
+  Validation: all 68 Python checks and all 5 Chromium workflows passed. A filled-retention scale
+  fixture reduced a 32.35 MB raw save to 9.10 MB, below the 12 MB request limit. Final scale timing,
+  annual trace, sensitivity and browser rendering measurements remain in the acceptance batch.

@@ -119,7 +119,8 @@ def branch_state(world, bid, br, f):
     status = 'ok' if G.in_service(br) else ('open' if not br['closed'] else 'repair' if br['repair_until'] is not None else 'tripped')
     if status == 'ok' and br['a'] not in world.network.energized:
         status = 'dead'
-    return [r(flow[0]) if flow else 0., r(flow[1]) if flow else 0., r(loading, 3), status]
+    return [r(flow[0]) if flow else 0., r(flow[1]) if flow else 0., r(loading, 3), status,
+            r(flow[0]+flow[2],5) if flow else 0.]
 
 
 def firm_power(world, f):

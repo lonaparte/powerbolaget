@@ -287,6 +287,7 @@ def monthly(world, minute):
             if k:
                 leave_jobs(world, p, k)
                 E.move_people(world, p, retired, k)
+    age_split_cohorts(world,minute,rng)
     # Off-island moves: life events for everyone, plus the push of unemployment and outages.
     utilities = zone_utilities(world)
     for p in sorted(world.pops.values(), key=lambda p: p['id']):
@@ -356,6 +357,25 @@ def monthly(world, minute):
             p['inactive'] = max(0, min(round(p['count']*.14), p['count']-p['employed']))
     refresh_stats(world)
     check_cap(world)
+
+
+def age_split_cohorts(world,minute,rng):
+    """Apply the same ageing to optional split POPs used by large scenarios and imported saves."""
+    canonical={f'{z["id"]}_{group}' for z in world.zones for group in GROUPS}
+    for p in sorted(world.pops.values(),key=lambda p:p['id']):
+        if p['id'] in canonical or p['kind']!='resident' or p['count']<=0:
+            continue
+        if p['group']=='youth':
+            n=min(p['count'],stochastic_round(rng,p['count']/(19*12)))
+            away=min(n,stochastic_round(rng,n*STUDY_LEAVE_SHARE))
+            emigrate(world,p,away,minute)
+            if n-away:
+                E.move_people(world,p,world.pops[f"{p['zone']}_{best_sector(world,p['zone'])}"],n-away)
+        elif p['group'] in SECTORS:
+            k=min(p['count'],stochastic_round(rng,p['count']/(46*12)))
+            if k:
+                leave_jobs(world,p,k)
+                E.move_people(world,p,world.pops[f"{p['zone']}_retired"],k)
 
 
 def emigrate(world, p, k, minute, prefer_unemployed=False):

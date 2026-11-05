@@ -112,8 +112,15 @@ test('engineering, retail offers and teaching-data recording work through the cl
   await page.click('#engineeringForm button[type="submit"]');
   await page.waitForSelector('#dialog[open] #dok');
   assert.match(await page.locator('#dialogBody').textContent(),/Independent 110 kV/);
+  assert.match(await page.locator('#dialogBody').textContent(),/CURRENT-WEATHER COMMISSIONING STUDY/);
   await page.click('#dok');
   await page.waitForFunction(()=>PB.snap.projects.some(p=>p.kind==='station'));
+  await page.evaluate(()=>PB.select('l_kal_ind'));
+  await page.waitForSelector('#inspector [data-work="maintenance"]');
+  await page.click('#inspector [data-work="maintenance"]');
+  await page.waitForSelector('#dialog[open] #startWork');
+  assert.match(await page.locator('#dialogBody').textContent(),/Cost.*Duration.*locked out/s);
+  await page.click('#cancelWork');
   await page.click('[data-view="economy"]');
   await page.click('[data-tab="finance"]');
   const policy=page.locator('form[data-retail="business"]');

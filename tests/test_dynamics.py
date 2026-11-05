@@ -62,3 +62,13 @@ def test_completed_event_reference_survives_a_later_save():
     b=World(state=json.loads(json.dumps(w.state())))
     w.advance(2);b.advance(2)
     assert b.flows['storage']['bess1']==pytest.approx(w.flows['storage']['bess1'],abs=.05)
+
+
+def test_stable_grid_forming_island_attempts_staged_load_restoration():
+    w=island_event();w.advance(2)
+    assert w.grid['storage']['bess1']['forming_active']
+    w.settings['frequency_shed']=.25
+    w.frequency_hz=50.
+    w.handle(dict(kind='load_recovery',time=w.t_now))
+    assert w.settings['frequency_shed']==pytest.approx(.15)
+    assert w.rms['active'] and w.archive.waveforms[-1]['cause']=='staged island load restoration'

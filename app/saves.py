@@ -7,6 +7,7 @@ references must exist; sizes are bounded so a crafted file cannot exhaust the se
 import re
 from math import isfinite
 from . import grid as G
+from . import history as H
 from .island import TURBINE_MODELS
 from .params import POP_CAP
 
@@ -82,7 +83,12 @@ def validate(state):
         v=ref.get('values',[])
         if len(v)!=3 or not _num(v[0],.05,1.2) or not _num(v[1],-1e9,1e9) or not _num(v[2],.001,1e8):
             raise SaveError('Invalid voltage reference settings.')
-    for name,s in state.get('rms',{}).get('states',{}).items():
+    rms=state.get('rms',{})
+    if not isinstance(rms,dict) or not isinstance(rms.get('states',{}),dict):
+        raise SaveError('Invalid RMS event state.')
+    for name,s in rms.get('states',{}).items():
+        if not isinstance(s,dict):
+            raise SaveError('Invalid RMS controller state.')
         y=s.get('y',[])
         if not ID.match(name) or len(y)!=4 or any(not _num(x,-1e9,1e9) for x in y) or not _num(s.get('factor'),1,50):
             raise SaveError('Invalid RMS controller state.')
@@ -94,13 +100,24 @@ def validate(state):
             raise SaveError('Invalid POP.')
     if len(state.get('events', {}).get('heap', [])) > LIMITS['heap']:
         raise SaveError('Too many queued events.')
-    archive=state.get('archive',{})
-    if not isinstance(archive,dict) or len(archive.get('selected',[]))>8 or len(archive.get('waveforms',[]))>8:
+    try:
+        archive=H.unpack(state.get('archive',{}))
+    except ValueError as exc:
+        raise SaveError(str(exc)) from exc
+    if not isinstance(archive,dict) or not isinstance(archive.get('selected',[]),list) or len(archive.get('selected',[]))>8 or not isinstance(archive.get('waveforms',[]),list) or len(archive.get('waveforms',[]))>8:
         raise SaveError('Invalid history archive.')
     for group,maxrows in (('hours',168),('days',30),('minutes',1440)):
         data=archive.get(group,{})
-        if not isinstance(data,dict) or len(data)>10000 or any(not isinstance(rows,list) or len(rows)>maxrows for rows in data.values()):
+        if not isinstance(data,dict) or len(data)>10000 or any(not isinstance(rows,list) or len(rows)>maxrows or
+                any(not isinstance(row,list) or len(row)>20 or any(not _num(x,-1e15,1e15) for x in row) for row in rows)
+                for rows in data.values()):
             raise SaveError('Invalid history retention.')
+    for event in archive.get('waveforms',[]):
+        if not isinstance(event,dict) or len(event.get('samples',[]))>3001 or len(event.get('actions',[]))>200:
+            raise SaveError('Invalid event waveform archive.')
+        objects=event.get('object_samples',{})
+        if not isinstance(objects,dict) or len(objects)>12 or any(not isinstance(rows,list) or len(rows)>3001 for rows in objects.values()):
+            raise SaveError('Invalid event object archive.')
     if not _num(state.get('minute'), 0, 525600*500) or not _num(state.get('seed'), 0, 2**31):
         raise SaveError('Invalid clock or seed.')
     return state

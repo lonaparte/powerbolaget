@@ -2,6 +2,7 @@ import json
 import pytest
 from app.world import World, command
 from app.history import export, as_csv
+from app import history as H
 
 
 def test_layered_history_survives_save_and_matches_metered_energy():
@@ -74,3 +75,20 @@ def test_unsafe_new_solver_settings_in_a_save_are_rejected():
     data=json.loads(json.dumps(w.state()))
     data['grid']['branches']['f_z06']['active_fault']={'bus':'z06','r':'1\nredirect bad'}
     with pytest.raises(SaveError):validate(data)
+
+
+def test_compressed_history_round_trips_and_rejects_tampering_or_bombs():
+    from app.saves import validate,SaveError
+    w=World(seed=4);w.advance(121)
+    plain=H.unpack(w.archive.state())
+    packed=H.pack(plain,threshold=0)
+    assert packed['encoding']=='zlib+base64' and packed['uncompressed_bytes']>len(packed['data'])
+    state=json.loads(json.dumps(w.state()));state['archive']=packed
+    validate(state)
+    loaded=World(state=state)
+    assert export(loaded)==export(w)
+    broken=dict(packed,sha256='0'*64)
+    state['archive']=broken
+    with pytest.raises(SaveError,match='checksum'):validate(state)
+    state['archive']=dict(packed,uncompressed_bytes=H.MAX_ARCHIVE_BYTES+1)
+    with pytest.raises(SaveError,match='large'):validate(state)

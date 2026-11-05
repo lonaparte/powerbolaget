@@ -178,6 +178,11 @@ class HistoryRequest(Ref):
     format: Literal['json','csv'] = 'json'
 
 
+class WorkPreviewRequest(Ref):
+    target: str = Field(pattern=ID)
+    action: Literal['maintenance','retrofit','decommission']
+
+
 @asynccontextmanager
 async def lifespan(app):
     try:
@@ -305,6 +310,11 @@ def export_history(payload: HistoryRequest):
 @app.post('/api/exchanges')
 def exchanges(payload: Ref):
     return call(payload.session,'exchanges')
+
+
+@app.post('/api/work/preview')
+def work_preview(payload: WorkPreviewRequest):
+    return call(payload.session,'work_preview',payload.model_dump(exclude={'session'}))
 
 
 app.mount('/', StaticFiles(directory=Path(__file__).resolve().parent.parent/'web', html=True), name='web')

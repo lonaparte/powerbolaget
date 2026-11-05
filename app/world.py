@@ -573,7 +573,8 @@ class World:
         acc['minutes'] += dt
         acc['maxload'] = max(acc['maxload'], load_req)
         if f['vm']:
-            vmin = min(v for b, v in f['vm'].items() if b in self.network.energized and v > .2) if self.network.energized else 1.
+            valid=[v for b,v in f['vm'].items() if b in self.network.energized and v>.2]
+            vmin=min(valid,default=0. if self.network.energized else 1.)
             acc['vmin'] = min(acc['vmin'], vmin)
         if dt >= .999 or t_to == int(t_to):
             self.minute_series.append((round(t_from, 3), round(load_req, 3), round(load_srv, 3), round(wind, 3),
@@ -606,8 +607,15 @@ class World:
             else:
                 return False
         elif kind == 'load_recovery':
-            if N.link_capacity(self)>0:
+            connected=N.link_capacity(self)>0
+            island_source=any(u.get('forming_active') and u['status']=='ok' and
+                (u.get('soc',0.)>.05 or (u.get('state')=='running' and u.get('fuel_mwh',0.)>0))
+                for u in G.forming_units(self.grid))
+            if self.physics_valid and 49.7<=self.frequency_hz<=50.3 and (connected or island_source):
                 self.settings['frequency_shed']=max(0.,self.settings.get('frequency_shed',0.)-.1)
+                self.log('protection',f"Staged load restoration: {self.settings['frequency_shed']:.0%} remains shed",None)
+                if island_source:
+                    D.start(self,t,'staged island load restoration')
                 if self.settings['frequency_shed']:
                     self.events.push(t+1,'load_recovery','restore')
         elif kind == 'restore':

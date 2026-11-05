@@ -1,4 +1,5 @@
 import pytest
+import copy
 from app import construction as C, engineering as X, grid as G, energy as N
 from app.world import World, command, plan_build, CommandError
 
@@ -37,6 +38,18 @@ def test_invalid_voltage_or_route_cannot_be_built():
         X.plan_line(w,'vhn_110','rom_20','CAB110')
     with pytest.raises(C.BuildError, match='endpoints'):
         X.plan_line(w,'vhn','rom','CAB110',[[0,0],[1,1]])
+
+
+def test_commissioning_impact_is_a_read_only_current_condition_study():
+    w=World(seed=8)
+    w.advance(2)
+    plan=plan_build(w,dict(type='storage',station='vhn',p_mw=10,hours=2))
+    before=copy.deepcopy(w.state())
+    result=X.impact(w,plan)
+    assert w.state()==before
+    assert result['minute']==w.minute and 'not a future forecast' in result['assumption']
+    assert result['before']['converged'] and result['after']['converged']
+    assert result['after']['minimum_voltage_pu'] > .8
 
 
 def test_links_are_player_led_with_capacity_constraints_and_source_handover():

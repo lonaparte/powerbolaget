@@ -165,6 +165,7 @@
     dialog(`<div class="eyebrow">CONSTRUCTION PROJECT</div><h2>${PB.esc(p.title)}</h2>
       <div class="kv"><span>Capital cost</span><span>${PB.msek(p.cost / 1e6)}</span><span>Construction time</span><span>${p.days} days</span>
       <span>Connection</span><span>${PB.esc(p.connection)}</span><span>Powerbolaget cash</span><span>${PB.msek(PB.snap.kpi.pb_cash)}</span></div>
+      ${j.impact?`<h3>CURRENT-WEATHER COMMISSIONING STUDY</h3><p class="small muted">${PB.esc(j.impact.assumption)}</p><div class="kv"><span>Demand served, before / after</span><span>${PB.fmt(j.impact.before.served_mw,2)} / ${PB.fmt(j.impact.after.served_mw,2)} MW</span><span>Minimum voltage after</span><span>${PB.fmt(j.impact.after.minimum_voltage_pu,4)} pu</span><span>Overloaded branches after</span><span>${j.impact.after.overloaded.length}</span><span>Numerical solution</span><span>${j.impact.after.converged?'converged':'failed; study unavailable'}</span></div>`:''}
       <p class="small muted">Paid monthly as work progresses; part of it goes to the island's construction firm. If cash runs short, the gap is booked as external financing. The power flow decides afterwards whether the network copes.</p>
       <div class="actions"><button class="button primary" id="dok">Start construction</button><button class="button" id="dno">Cancel</button></div>`);
     $('dok').onclick = async () => { closeDialog(); const ok = await PB.command({kind: 'build', build}); if (ok) { cancelBuild(); setDock('projects'); } };

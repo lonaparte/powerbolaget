@@ -26,7 +26,7 @@ PB.inspector = (() => {
       ${kv([['Residents', PB.int(k.residents)], ['Visitors and holiday homes', PB.int(k.tourists + k.holiday)], ['Unemployment', PB.pct(k.unemployed / Math.max(1, k.labour), 1)],
         ['Demand served', `${PB.fmt(t.load, 1)} of ${PB.fmt(t.requested, 1)} MW`], ['Wind output', `${PB.fmt(t.wind, 1)} of ${PB.fmt(t.wind_avail, 1)} MW available`],
         ['Mainland exchange', `${PB.fmt(t.link, 1)} MW (capacity ${PB.fmt(t.link_cap, 0)})`], ['· HVDC / HVAC', `${PB.fmt(t.link_dc, 1)} / ${PB.fmt(t.link_ac, 1)} MW`],
-        ['Voltage reference', PB.esc(t.reference)], ['Batteries', PB.mw(t.battery)], ['Network losses', PB.mw(t.losses)],
+        ['Voltage reference', PB.esc(t.reference)],['Frequency',PB.fmt(t.frequency_hz,3)+' Hz'],['Data quality',PB.esc(t.quality)], ['Batteries', PB.mw(t.battery)], ['Network losses', PB.mw(t.losses)],
         ['Mainland price', `${PB.fmt(t.price, 2)} SEK/kWh`], ['Household tariff', `${PB.fmt(t.tariff, 2)} SEK/kWh`],
         ['Powerbolaget cash', PB.msek(k.pb_cash)], ['External financing', PB.msek(k.financing)]])}
       <h3>WIND FARMS</h3><ul class="list">${farms}</ul>
@@ -142,7 +142,12 @@ PB.inspector = (() => {
     if (d.type==='project' && d.status==='building') html += `<button class="button" id="cancelProject">Cancel project</button>`;
     html+=`<div class="actions"><button class="button" id="objectData">History / export…</button></div>`;
     el.innerHTML = `<button class="button" data-back="1" style="float:right">✕</button>` + html;
-    el.querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>PB.command({kind:'asset_work',target:d.id,action:b.dataset.work}));
+    el.querySelectorAll('[data-work]').forEach(b=>b.onclick=async()=>{
+      try{const p=await PB.call('/work/preview',{target:d.id,action:b.dataset.work});const dialog=PB.$('dialog');
+        PB.$('dialogBody').innerHTML=`<h2>${PB.esc(p.title)}</h2>${kv([['Cost',PB.msek(p.cost/1e6)],['Duration',p.days+' days'],['Operation',PB.esc(p.connection)]])}<p class="small muted">The asset is locked out during work. Cancelling retains costs already paid.</p><div class="actions"><button class="button primary" id="startWork">Start work</button><button class="button" id="cancelWork">Cancel</button></div>`;
+        PB.$('startWork').onclick=()=>{dialog.close();PB.command({kind:'asset_work',target:d.id,action:b.dataset.work});};PB.$('cancelWork').onclick=()=>dialog.close();if(!dialog.open)dialog.showModal();
+      }catch(e){PB.toast(e.message,true);}
+    });
     el.querySelector('#cancelProject')?.addEventListener('click',()=>PB.command({kind:'cancel_project',target:d.id}));
     el.querySelector('#objectData')?.addEventListener('click',()=>PB.history.open(d.id));
     el.querySelector('#applyQ')?.addEventListener('click',()=>PB.command({kind:'reactive_control',target:d.id,q_mode:PB.$('qmode').value,q_setpoint:Number(PB.$('qset').value),v_setpoint:Number(PB.$('vset').value)}));

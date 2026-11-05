@@ -73,6 +73,14 @@ def test_energy_bookkeeping_matches_the_minutes(day_world):
     assert h['load'] == pytest.approx(h['served']+h['unserved'], rel=1e-6, abs=1e-6)
 
 
+def test_voltage_statistic_records_collapse_without_crashing_on_an_empty_filter():
+    w=World(seed=2);w.advance(1)
+    w.flows['vm']={bus:0. for bus in w.flows['vm']}
+    assert w.network.energized
+    w.integrate(w.t_now+1)
+    assert w.acc['vmin']==0.
+
+
 def test_outage_trips_equipment_at_once_and_restart_waits():
     w = World(seed=2)
     w.advance(10)

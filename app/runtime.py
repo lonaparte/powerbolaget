@@ -24,6 +24,7 @@ def worker(conn):
     os.environ.setdefault('OMP_NUM_THREADS', '1')
     from . import views
     from . import history
+    from . import engineering
     from .construction import BuildError
     from .saves import SaveError
     from .world import CommandError, World, command, plan_build
@@ -52,13 +53,14 @@ def worker(conn):
             plan = plan_build(w, dict(a['build']))
         except BuildError as exc:
             return dict(ok=False, error=str(exc))
-        return dict(ok=True, plan=plan)
+        return dict(ok=True, plan=plan,impact=engineering.impact(w,plan))
 
     ops = dict(
         tick=tick, command=cmd, preview=preview, save=lambda w, a: w.state(),
         entity=lambda w, a: views.entity(w, a['id']), table=lambda w, a: views.table(w, a['name']),
         parcel=lambda w, a: views.parcel(w, a['x'], a['y']),
         history=lambda w,a: history.export(w,**a), exchanges=lambda w,a:w.messages)
+    ops['work_preview']=lambda w,a:engineering.plan_asset(w,a['target'],a['action'])
     while True:
         try:
             op, sid, args = conn.recv()

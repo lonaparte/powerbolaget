@@ -19,7 +19,12 @@ def test_a_new_game_runs_and_takes_commands(client):
     s = client.post('/api/tick', json={'session': sid, 'minutes': 45}, headers=H).json()['snapshot']
     assert s['minute'] == 45 and s['totals']['load'] > 20
     p = client.post('/api/preview', json={'session': sid, 'build': {'type': 'storage', 'station': 'vhn', 'p_mw': 10, 'hours': 2}}, headers=H).json()
-    assert p['ok'] and p['plan']['cost'] > 0
+    assert p['ok'] and p['plan']['cost'] > 0 and p['impact']['after']['converged']
+    before = client.post('/api/save', json={'session': sid}, headers=H).json()
+    client.post('/api/preview', json={'session': sid, 'build': {'type': 'storage', 'station': 'vhn', 'p_mw': 12, 'hours': 2}}, headers=H)
+    assert client.post('/api/save', json={'session': sid}, headers=H).json() == before
+    work = client.post('/api/work/preview', json={'session':sid,'target':'l_kal_ind','action':'maintenance'}, headers=H).json()
+    assert work['cost'] > 0 and work['days'] > 0 and work['target'] == 'l_kal_ind'
     r = client.post('/api/command', json={'session': sid, 'command': {'kind': 'build', 'build': {'type': 'storage', 'station': 'vhn', 'p_mw': 10, 'hours': 2}}}, headers=H)
     assert r.status_code == 200 and r.json()['snapshot']['projects']
     bad = client.post('/api/command', json={'session': sid, 'command': {'kind': 'build', 'build': {'type': 'storage', 'station': 'nowhere', 'p_mw': 10, 'hours': 2}}}, headers=H)

@@ -9,11 +9,11 @@ PB.map = (() => {
   const angle = {};
   const layers = {
     island: {zones: true, wind: false, wake: false, population: false, tourism: false, industry: true, load: false, outages: true, grid: true},
-    grid: {voltage: true, loading: true, flow: true, islands: true, labels: true},
+    grid: {voltage: true, loading: true, flow: true, reactive: false, losses: false, islands: true, labels: true},
   };
   const LAYER_NAMES = {zones: 'Zone borders', wind: 'Wind field', wake: 'Turbine wakes', population: 'Population', tourism: 'Tourism',
     industry: 'Industry', load: 'Load density', outages: 'Outages', grid: 'Power lines', voltage: 'Bus voltage', loading: 'Line loading',
-    flow: 'Power flow', islands: 'Energised areas', labels: 'Names'};
+    flow: 'Active power flow', reactive:'Reactive flow (Mvar)',losses:'Losses (red ≥0.5 MW)',islands: 'Energised areas', labels: 'Names'};
   const FILL_LAYERS = ['population', 'tourism', 'load', 'outages'];
 
   // ------------------------------------------------------------ geometry
@@ -280,13 +280,18 @@ PB.map = (() => {
       if (mode === 'grid') {
         width = kv >= 100 ? 2 : 1;
         col = layers.grid.loading ? loadingColor(v[2]) : kvColor(kv);
+        if(layers.grid.losses)col=loadingColor(Math.max(0,v[4]||0)*2);
         if (layers.grid.islands && status === 'dead') col = '#555a6e';
       } else if (b[2] === 'line' && kv < 30 && view.z < 2.5) continue;
       if (status === 'planned') { if (b[3] === 'CAB220' || mode === 'grid' || view.z >= 3) draw('#8a90a8', width, 3); continue; }
       if (b[3] === 'CAB220' && mode === 'island') col = css('--teal');
       if (status === 'tripped' || status === 'repair' || status === 'open') { draw(css('--red'), width, 2); continue; }
       draw(col, width);
-      if (mode === 'grid' && layers.grid.flow && status === 'ok') flowDots(x0, y0, x1, y1, v[0]);
+      if (mode === 'grid' && (layers.grid.flow || layers.grid.reactive) && status === 'ok') {
+        const quantity=layers.grid.reactive?v[1]:v[0];
+        if(path.length<2)flowDots(x0,y0,x1,y1,quantity);
+        else for(let i=1;i<path.length;i++)flowDots(...path[i-1],...path[i],quantity);
+      }
       if (mode === 'island' && v[2] > .95 && (frame >> 3) & 1) L(x0, y0, x1, y1, css('--red'), width);
     }
   }
@@ -456,9 +461,12 @@ PB.map = (() => {
     if (mode === 'grid' || layers.island.grid) {
       for (const [id, b] of Object.entries(st.branches)) {
         if (id === 'hvdc') continue;
-        const [[x0, y0], [x1, y1]] = branchEnds(st, b), L2 = (x1 - x0) ** 2 + (y1 - y0) ** 2; if (L2 < 1) continue;
-        const t = PB.clamp(((px - x0) * (x1 - x0) + (py - y0) * (y1 - y0)) / L2), d = Math.hypot(x0 + t * (x1 - x0) - px, y0 + t * (y1 - y0) - py);
-        if (d < 2.5 && d < bd) { bd = d; best = id; }
+        const path=st.routes?.[id]?.map(p=>toPx(...p)) || branchEnds(st,b);
+        for(let i=1;i<path.length;i++){
+          const [[x0,y0],[x1,y1]]=[path[i-1],path[i]],L2=(x1-x0)**2+(y1-y0)**2;if(L2<1)continue;
+          const t=PB.clamp(((px-x0)*(x1-x0)+(py-y0)*(y1-y0))/L2),d=Math.hypot(x0+t*(x1-x0)-px,y0+t*(y1-y0)-py);
+          if(d<2.5 && d<bd){bd=d;best=id;}
+        }
       }
       if (best) return best;
     }
@@ -523,12 +531,16 @@ PB.map = (() => {
   }
 
   // ------------------------------------------------------------ public
-  function loop() { try { draw(); } catch (e) { console.error(e); } requestAnimationFrame(loop); }
+  const renderTimes=[],frameTimes=[];let lastFrame=0;
+  function loop() { const start=performance.now();if(lastFrame)frameTimes.push(start-lastFrame);lastFrame=start;
+    try { draw(); } catch (e) { console.error(e); }renderTimes.push(performance.now()-start);
+    if(renderTimes.length>600)renderTimes.shift();if(frameTimes.length>600)frameTimes.shift();requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
   PB.on('theme', () => { terrainKey = ''; });
   PB.on('static', () => { terrainKey = ''; placeLabels(); });
   PB.on('snapshot', () => { if (frame % 4 === 0) placeLabels(); });
   return {
+    performance(){const sorted=renderTimes.slice().sort((a,b)=>a-b),mean=a=>a.reduce((s,x)=>s+x,0)/Math.max(1,a.length);return {samples:sorted.length,render_mean_ms:mean(renderTimes),render_p95_ms:sorted[Math.floor(.95*sorted.length)]||0,fps:1000/mean(frameTimes),scope:'last 600 animation frames'};},
     setMode(m) { mode = m; terrainKey = ''; placeLabels(); PB.map.renderLayers(); },
     get mode() { return mode; },
     layers, focus(id) { const p = positionOf(id); if (p) { view.cx = p[0]; view.cy = p[1]; view.z = Math.max(view.z, 6); terrainKey = ''; placeLabels(); } },
