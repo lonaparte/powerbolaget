@@ -211,6 +211,18 @@ Three views (island, grid, economy), map layers, a context inspector, parcel det
 Calibrated economic coefficients, tariff pass-through, the turbine dynamic model, HVAC and HVDC control choices, construction costs and durations, and load calibration against public annual statistics are all open. UI usability with students is still to be tested.
 # Confirmed retail and private finance rules
 
+The persisted teaching archive retains 168 hourly rows and 30 daily rows per object, 1,440 minute
+samples for each of up to eight selected electrical objects, and eight event windows. These bounds
+are shown in the export dialog. Device/turbine energy is integrated MWh; other hourly engineering
+fields are end-of-hour snapshots (firm cash is before that hour's bill settlement). Daily energy sums
+and mean state snapshots are distinguished in export metadata. Global daily game history is retained
+separately. CSV headings contain units; JSON includes schema, interval, units and retention metadata.
+
+ActivityPlan, DemandTrajectory, PhysicalResult and EconomicSettlement messages use versioned envelopes
+with explicit intent/forecast/actual semantics, intervals, topology mapping and forecast versions.
+Demand forecasts are conditional device/activity projections, not energy budgets. Hourly settlement
+uses a saved contiguous watermark; retrying an already-settled interval cannot duplicate goods or cash.
+
 Backup generation is fuel oil only. New synchronous engines take ten minutes to start, have
 30/15-minute minimum up/down times, a 20% minimum output and 20%-of-rating/minute ramp. Automatic
 backup starts for a capacity deficit; a running black-start unit can form an island after a blackout.

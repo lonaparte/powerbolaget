@@ -28,7 +28,7 @@ Completion means executable behavior and validation, not just documentation or a
 - [x] Contract-consistent planning, retail policy and bounded private finance/exit.
 - [ ] Editable engineering, oil backup, player-controlled links and asset lifecycle.
 - [ ] Aggregated electrical dynamics, P/Q limits and fault/protection/restoration behavior.
-- [ ] Versioned module exchanges, persistent layered history and engineering exports.
+- [x] Versioned module exchanges, persistent layered history and engineering exports (event producer follows).
 - [ ] Client controls, layers, object analysis and event inspection.
 - [ ] Calibration, conservation/reference checks, sensitivity and scale measurements.
 
@@ -60,3 +60,8 @@ without a public source are assumptions and must be visible as such in the model
   capability; storage calendar/cycle fade and replacement/retirement. Initial voltage-control gain
   was rejected by regression testing and reduced; controller feedback is persisted. Validation:
   all 42 Python tests and all 4 browser workflows passed.
+- Batch 4: versioned intent/forecast/actual exchange envelopes, persisted contiguous settlement
+  watermark, saved object history, selected minute recording, hourly/daily object archive and CSV/JSON
+  exports with units and retention. Added a browser workflow for engineering, tariff editing, minute
+  recording and CSV download. Validation: 46 Python tests and 5 browser workflows passed. Event
+  storage/export is ready; the actual RMS event producer belongs to the next batch.

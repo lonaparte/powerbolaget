@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Literal, Optional
 from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from . import __version__ as VERSION
@@ -131,7 +131,8 @@ class RetailPolicy(BaseModel):
 class Command(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_id: Optional[str] = Field(default=None, min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
-    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings', 'retail_policy', 'asset_work', 'cancel_project', 'generator_mode', 'reactive_control']
+    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings', 'retail_policy', 'asset_work', 'cancel_project', 'generator_mode', 'reactive_control', 'record']
+    recording: bool = True
     action: Optional[Literal['decommission','retrofit','maintenance']] = None
     category: Optional[Literal['household', 'industry', 'business']] = None
     policy: Optional[RetailPolicy] = None
@@ -166,6 +167,15 @@ class ParcelRequest(Ref):
 
 class TableRequest(Ref):
     name: Literal['zones', 'pops', 'firms', 'markets', 'finance', 'demography', 'history', 'outlook']
+
+
+class HistoryRequest(Ref):
+    key: str = Field(default='global',max_length=64)
+    resolution: Literal['hour','day','minute','event'] = 'hour'
+    start: float = Field(default=0,ge=0)
+    end: Optional[float] = Field(default=None,ge=0)
+    event_id: Optional[str] = Field(default=None,max_length=80)
+    format: Literal['json','csv'] = 'json'
 
 
 @asynccontextmanager
@@ -281,6 +291,20 @@ def table(payload: TableRequest):
 async def failed(request, exc):
     logging.error('Simulation failed: %s', exc)
     return JSONResponse({'detail': 'The simulation failed; the error is in the server log.'}, status_code=503)
+
+
+@app.post('/api/history')
+def export_history(payload: HistoryRequest):
+    from .history import as_csv
+    data=call(payload.session,'history',payload.model_dump(exclude={'session','format'}))
+    if payload.format=='csv':
+        return Response(as_csv(data),media_type='text/csv',headers={'Content-Disposition':'attachment; filename="powerbolaget-history.csv"'})
+    return data
+
+
+@app.post('/api/exchanges')
+def exchanges(payload: Ref):
+    return call(payload.session,'exchanges')
 
 
 app.mount('/', StaticFiles(directory=Path(__file__).resolve().parent.parent/'web', html=True), name='web')

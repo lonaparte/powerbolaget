@@ -100,3 +100,37 @@ test('the layout fits a phone screen', {timeout: 60000}, async t => {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), 0);
   assert.deepEqual(errors, []);
 });
+
+test('engineering, retail offers and teaching-data recording work through the client', {timeout:90000}, async t => {
+  const context=await browser.newContext({viewport:{width:1366,height:860}});
+  t.after(()=>context.close());
+  const {page,errors}=await open(context);
+  await page.evaluate(()=>{PB.running=false;});
+  await page.click('#engineering');
+  await page.selectOption('#engineeringForm [name="type"]','station');
+  await page.fill('#engineeringForm [name="name"]','Teaching station');
+  await page.click('#engineeringForm button[type="submit"]');
+  await page.waitForSelector('#dialog[open] #dok');
+  assert.match(await page.locator('#dialogBody').textContent(),/Independent 110 kV/);
+  await page.click('#dok');
+  await page.waitForFunction(()=>PB.snap.projects.some(p=>p.kind==='station'));
+  await page.click('[data-view="economy"]');
+  await page.click('[data-tab="finance"]');
+  const policy=page.locator('form[data-retail="business"]');
+  await policy.locator('[name="network_fee"]').fill('.35');
+  await policy.locator('button[type="submit"]').click();
+  await page.waitForFunction(()=>document.getElementById('toast').textContent.includes('business contract offers updated'));
+  assert.equal(await page.evaluate(async()=>(await PB.call('/table',{name:'finance'})).retail_policy.business.network_fee),.35);
+  await page.click('#menuBtn');
+  await page.click('[data-menu="history"]');
+  await page.selectOption('#dataExport [name="key"]','res_z01');
+  await page.click('#recordObject');
+  await page.waitForFunction(()=>document.getElementById('dataStatus').textContent.includes('recording started'));
+  await page.evaluate(async()=>{const j=await PB.call('/tick',{minutes:2});PB.apply(j.snapshot);});
+  await page.selectOption('#dataExport [name="resolution"]','minute');
+  await page.fill('#dataExport [name="end"]','9999');
+  const downloaded=page.waitForEvent('download');
+  await page.click('#dataExport button[type="submit"]');
+  assert.match((await downloaded).suggestedFilename(),/res_z01\.csv$/);
+  assert.deepEqual(errors,[]);
+});

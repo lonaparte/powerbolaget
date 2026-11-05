@@ -74,6 +74,13 @@ def validate(state):
             raise SaveError('Invalid POP.')
     if len(state.get('events', {}).get('heap', [])) > LIMITS['heap']:
         raise SaveError('Too many queued events.')
+    archive=state.get('archive',{})
+    if not isinstance(archive,dict) or len(archive.get('selected',[]))>8 or len(archive.get('waveforms',[]))>8:
+        raise SaveError('Invalid history archive.')
+    for group,maxrows in (('hours',168),('days',30),('minutes',1440)):
+        data=archive.get(group,{})
+        if not isinstance(data,dict) or len(data)>10000 or any(not isinstance(rows,list) or len(rows)>maxrows for rows in data.values()):
+            raise SaveError('Invalid history retention.')
     if not _num(state.get('minute'), 0, 525600*500) or not _num(state.get('seed'), 0, 2**31):
         raise SaveError('Invalid clock or seed.')
     return state

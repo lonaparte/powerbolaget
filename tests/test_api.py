@@ -34,6 +34,9 @@ def test_a_new_game_runs_and_takes_commands(client):
     assert r.status_code == 200
     finance = client.post('/api/table', json={'session': sid, 'name':'finance'}, headers=H).json()
     assert finance['retail_policy']['business']['network_fee'] == .35
+    assert client.post('/api/history',json={'session':sid,'format':'csv'},headers=H).headers['content-type'].startswith('text/csv')
+    exchanges=client.post('/api/exchanges',json={'session':sid},headers=H).json()
+    assert exchanges['DemandTrajectory']['meaning']=='forecast'
     loaded = client.post('/api/session/load', json={'save': save}, headers=H).json()
     assert loaded['snapshot']['minute'] == 45
 

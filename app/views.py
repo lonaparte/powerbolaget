@@ -34,6 +34,7 @@ def static(world):
         substations={s['id']: [s['name'], s['x'], s['y'], s['hv_bus'], s['mv_bus'], s['transformers']] for s in world.substations.values()},
         storage={s['id']: [s['name'], s['station'], s['x'], s['y'], s['p_mw'], s['e_mwh'], s['grid_forming']] for s in grid['storage'].values()},
         oil={g['id']:[g['name'],g['x'],g['y'],g['bus'],g['p_mw']] for g in grid.get('oil',{}).values()},
+        devices={k:[d.get('name',d['kind']),d['bus']] for k,d in world.devices.items()},
         link=dict(bus=grid['link']['bus'], x=grid['link']['x'], y=grid['link']['y'], poles=[[p['id'], p.get('name', p['id']), p['mw']] for p in grid['link']['poles']]),
         hvac=dict(name=grid['hvac']['name'], station=grid['hvac']['station'], mainland=grid['hvac']['mainland'], cables=grid['hvac']['cables'],
                   stages=[dict(date=label(st['minute']).rsplit(' · ', 1)[0], cables=st['cables'], mw=st['mw']) for st in grid['hvac']['stages']]),
@@ -193,6 +194,11 @@ def entity(world, eid):
                     setpoint=s['setpoint'], grid_forming=s['grid_forming'], forming=bool(s.get('forming_active')), status=s['status'],
                     p=r(f.get('storage', {}).get(eid, 0.)), q=s.get('q',0.), soh=s.get('soh',1.),reactive=reactive(s),
                     throughput_mwh=r(s['cycles_mwh'], 1), actions=['storage_mode'])
+    if eid in world.devices:
+        d=world.devices[eid]
+        return dict(type='device',id=eid,title=d.get('name',d['kind']),bus=d['bus'],kind=d['kind'],
+                    requested=d['p'],served=d['p']*d['served'],q=d['q']*d['served'],
+                    energy_requested=d['e_req'],energy_served=d['e_srv'])
     if eid in world.substations:
         s = world.substations[eid]
         return dict(type='substation', id=eid, title=s['name'], hv_bus=s['hv_bus'], mv_bus=s['mv_bus'],

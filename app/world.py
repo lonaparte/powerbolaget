@@ -27,6 +27,8 @@ from . import weather as W
 from . import retail as R
 from . import finance as F
 from . import generation as O
+from . import history as H
+from .exchange import message
 from .calendar import DAY, HOUR, is_rest_day, label, month_index, parts, stamp
 from .events import EventQueue
 from .ledger import Ledger
@@ -44,6 +46,8 @@ HISTORY_HOURS = 24*90
 class World:
     def __init__(self, seed=1, state=None, backend='opendss'):
         self.backend = backend
+        self.archive=H.Archive((state or {}).get('archive'))
+        self.messages=(state or {}).get('messages',{})
         if state is None:
             self._fresh(seed)
         else:
@@ -53,7 +57,8 @@ class World:
         self.flows = None
         self.t_now = float(self.minute)
         self.minute_series = deque(maxlen=1440)
-        self.entity_hist = {}
+        self.entity_hist = {k:deque(v,maxlen=168) for k,v in (state or {}).get('entity_hist',{}).items()}
+        self.settled_until=(state or {}).get('settled_until',self.history_hour[-1]['t']+60 if self.history_hour else 0)
         self.perf = dict(minutes=0, solve_ms=deque(maxlen=2000), step_ms=deque(maxlen=2000), failures=0)
         self.ferry_orders = []
         self.hvdc_setpoint = 0.
@@ -135,7 +140,9 @@ class World:
                     price_avg=self.price_avg, contract_price=self.contract_price, last_losses=self.last_losses,
                     construction_backlog=self.construction_backlog, outage_today=self.outage_today,
                     command_receipts=self.command_receipts, retail_policy=self.retail_policy,
-                    retail_version=self.retail_version, contracts=self.contracts, price_observations=self.price_observations)
+                    retail_version=self.retail_version, contracts=self.contracts, price_observations=self.price_observations,
+                    archive=self.archive.state(),messages=self.messages,settled_until=self.settled_until,
+                    entity_hist={k:list(v) for k,v in self.entity_hist.items()})
 
     @staticmethod
     def _blank_demo():
@@ -381,6 +388,9 @@ class World:
         self.flows = dict(t=t, link=dc+ac, link_dc=dc, link_ac=ac, link_q=res.source_q_mvar, losses=res.losses_mw, storage=storage,
                           loading=loading, branches=res.branches, vm=res.bus_vm, va=res.bus_va,
                           dev={did: (reqs[did][0], served[did]) for did in reqs}, turb=dict(turb),oil=oil)
+        self.messages['PhysicalResult']=message(self,'PhysicalResult',t,t,dict(converged=True,
+            requested_mw=sum(p for p,q in reqs.values()),served_mw=sum(reqs[k][0]*v for k,v in served.items()),
+            wind_mw=sum(turb.values()),oil_mw=sum(oil.values()),link_mw=dc+ac,loss_mw=res.losses_mw))
         for did, (p, q) in reqs.items():
             d = self.devices[did]
             d['p'], d['q'], d['served'] = p, q, served[did]
@@ -500,6 +510,7 @@ class World:
         if dt >= .999 or t_to == int(t_to):
             self.minute_series.append((round(t_from, 3), round(load_req, 3), round(load_srv, 3), round(wind, 3),
                                        round(f['link'], 3), round(sum(f['storage'].values()), 3)))
+            self.archive.minute(self,t_to)
         self.t_now = t_to
 
     # ------------------------------------------------------------ events
@@ -765,6 +776,18 @@ class World:
                 elif d['kind'] == 'farm':
                     L.retarget(d, m, f['herd']*f['capacity_factor'])
         E.plan_hour(self, m)
+        self.messages['ActivityPlan']=message(self,'ActivityPlan',m,m+60,
+            dict(firms={fid:dict(status=f['status'],staff=f['staff'],equipment=f['equipment']) for fid,f in self.firms.items()},
+                 equipment_events=[e for e in self.events.pending() if e['kind']=='equipment' and m<=e['time']<m+60]))
+        projection=[]
+        for dt in (0,30,60):
+            predicted=self.forecast(m,m+dt)
+            ctx=dict(rest=is_rest_day(m+dt))
+            power=sum(L.request(d,m+dt,predicted,ctx) for d in self.devices.values()
+                      if d['owner'][0]!='firm' or self.firms[d['owner'][1]]['status']=='operating')
+            projection.append(dict(t=m+dt,p_mw=power))
+        self.messages['DemandTrajectory']=message(self,'DemandTrajectory',m,m+60,
+            dict(method='conditional device/activity projection',samples=projection))
         N.sample_faults(self, m)
 
     def _prime_scales(self, m):
@@ -778,7 +801,13 @@ class World:
                 d['s0'] = d['s1']
 
     def settle_hour(self, start, end):
+        if end<=self.settled_until:
+            return
+        if start!=self.settled_until:
+            raise ValueError('Hourly settlements must be contiguous and cannot overlap.')
+        before=dict(self.ledger.totals)
         E.settle_hour(self, start, end)
+        H.capture_hour(self,start)
         acc = self.acc
         led = self.ledger
         # Electricity bills for what was actually delivered (spec 5.5), and the link's energy at the mainland price.
@@ -840,6 +869,10 @@ class World:
             residents=sum(st['zone_residents'].values()), unemployed=sum(st['zone_unemployed'].values()),
             pb_cash=round(led.balance('pb')), vmin=round(acc['vmin'], 4), peak=round(acc['maxload'], 3),
             sales=round(sales)))
+        self.messages['EconomicSettlement']=message(self,'EconomicSettlement',start,end,
+            dict(served_mwh=acc['load_srv'],requested_mwh=acc['load_req'],
+                 payments_sek={k:v-before.get(k,0.) for k,v in led.totals.items() if v!=before.get(k,0.)}))
+        self.settled_until=end
         self.acc = self._blank_acc()
 
     def entity_point(self, key, *values):
@@ -1056,6 +1089,12 @@ def command(world, cmd):
         g['mode']=cmd['mode']
         g['setpoint']=min(g['p_mw'],max(.2*g['p_mw'],float(cmd.get('setpoint') or g['p_mw'])))
         result=g['name']+': '+g['mode']
+    elif kind == 'record':
+        try:
+            world.archive.record(world,cmd['target'],bool(cmd.get('recording',True)))
+        except ValueError as exc:
+            raise CommandError(str(exc))
+        result='Minute recording '+('enabled' if cmd.get('recording',True) else 'stopped')
     elif kind == 'reactive_control':
         asset=world.grid['turbines'].get(cmd['target']) or world.grid['storage'].get(cmd['target']) or world.grid.get('oil',{}).get(cmd['target'])
         if not asset or cmd.get('q_mode') not in ('voltage','fixed'):

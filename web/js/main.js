@@ -184,6 +184,7 @@
     try {
       if (m === 'save') await PB.saveNow(false);
       if (m === 'export') PB.download(await PB.saveNow(false));
+      if (m === 'history') PB.history.open();
       if (m === 'import') $('importFile').click();
       if (m === 'new') newGame();
       if (m === 'about') about();
