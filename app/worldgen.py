@@ -109,8 +109,10 @@ def build_grid(world):
 
 
 def build_hvac(world, grid):
-    """The planned AC interconnector: present from the start as planned equipment, commissioned in stages
-    by the national grid operator (not Powerbolaget), as dated events."""
+    """Create disabled route/catalog metadata for a possible player-led AC interconnector.
+
+    Historical stage dates remain scenario background only; no event commissions this equipment.
+    """
     sid, name, sx, sy = HVAC['station']
     G.add_bus(grid, 'mainland_ac', 'Mainland 220 kV grid', 220., HVAC['mainland'][0], HVAC['mainland'][1], 'mainland')
     G.add_bus(grid, 'stk_220', f'{name} 220 kV', 220., sx, sy, 'interconnector')

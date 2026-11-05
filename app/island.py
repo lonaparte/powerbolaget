@@ -62,11 +62,10 @@ LINK_STATION = ('LNK', 'Länkstation', 16.2, 74.0)
 # Existing HVDC: two links of 130 MW, the scale of Gotland's two HVDC links (fictional equipment).
 LINK_POLES = 2
 LINK_POLE_MW = 130.0
-# Planned HVAC interconnector, after Svenska kraftnät's Gotlandsförbindelsen: two 220 kV AC subsea
-# cables from the mainland (Misterhult, Oskarshamn) to a new station south of the main town (Stenkumla),
-# in service from 2031 = FE 6 (FE 1 = 2026). A 2022 planning document gives 440 MW of transfer capacity
-# and mentions 200 MW steps; the staging below is an assumption: the first cable at a limited rating,
-# the second cable a few months later, full capacity once the mainland grid is reinforced.
+# HVAC route background, after Svenska kraftnät's Gotlandsförbindelsen: two 220 kV AC subsea cables
+# from the mainland (Misterhult, Oskarshamn) to a station south of the main town (Stenkumla). The dated
+# stages are historical scenario metadata and a capacity-envelope assumption; they never trigger
+# construction. The player chooses technology, capacity, island landing and timing.
 HVAC = dict(station=('STK', 'Stenkumla', 21.5, 75.5), mainland=(-38.0, 62.0), cables=2, km=160.0,
             stages=[(5, 243, 1, 150.0), (6, 59, 2, 300.0), (8, 0, 2, 440.0)])   # (year-1, day of year, cables, MW)
 

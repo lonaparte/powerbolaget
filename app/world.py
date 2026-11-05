@@ -860,7 +860,7 @@ class World:
                 tb['grid_wait'] = t+8
 
     def interconnector_stage(self, i):
-        """A stage of the grid operator's HVAC link comes into service (dated in the opening state)."""
+        """Legacy handler retained for old event payloads; loading cancels every such event."""
         ac = self.grid['hvac']
         stage = ac['stages'][i]
         for c in ac['cables'][:stage['cables']]:

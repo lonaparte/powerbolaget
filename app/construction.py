@@ -4,8 +4,9 @@ A build command is checked (land, spacing, connection), priced and queued. Progr
 monthly, partly to the island's construction firm and partly off-island. On completion the new
 equipment is commissioned into world.grid and the power-flow model is rebuilt. Under the free-
 investment rule a project is never refused for lack of money: the shortfall is booked as external
-financing. Previews show cost, duration and the electrical connection; they do not promise that the
-power flow will be feasible, which the solver checks after commissioning.
+financing. Previews show cost, duration and the electrical connection. A separate read-only,
+current-condition impact study compares the proposed commissioning with the present grid; the live
+solver still checks the actual future system when construction completes.
 """
 from math import hypot
 from . import grid as G

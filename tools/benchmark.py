@@ -42,6 +42,9 @@ def main():
     ap.add_argument('--resume',type=Path,help='continue from a benchmark checkpoint')
     ap.add_argument('--checkpoint-every',type=int,default=10)
     a = ap.parse_args()
+    # Capture provenance before importing/advancing any checkpointed state. The branch may receive
+    # documentation or UI commits while a long annual run is active.
+    source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     t0 = time.perf_counter()
     if a.resume:
         w=World(state=validate(json.loads(a.resume.read_text(encoding='utf-8'))))
@@ -76,7 +79,7 @@ def main():
     solves = sorted(w.perf['solve_ms'])
     q = lambda xs, f: round(xs[min(len(xs)-1, int(f*len(xs)))], 3) if xs else None
     report = dict(
-        git_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
+        git_commit=source_commit,
         processor_model=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name')),platform.machine()),
         version=__version__, seed=w.seed, days=a.days, python=platform.python_version(), machine=platform.machine(),
         processor=platform.processor() or platform.machine(), wall_s=round(time.perf_counter()-t0, 1),
