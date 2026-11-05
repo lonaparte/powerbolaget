@@ -33,6 +33,7 @@ def static(world):
         farms={f['id']: [f['name'], f['hub'], f['substation']] for f in grid['farms'].values()},
         substations={s['id']: [s['name'], s['x'], s['y'], s['hv_bus'], s['mv_bus'], s['transformers']] for s in world.substations.values()},
         storage={s['id']: [s['name'], s['station'], s['x'], s['y'], s['p_mw'], s['e_mwh'], s['grid_forming']] for s in grid['storage'].values()},
+        oil={g['id']:[g['name'],g['x'],g['y'],g['bus'],g['p_mw']] for g in grid.get('oil',{}).values()},
         link=dict(bus=grid['link']['bus'], x=grid['link']['x'], y=grid['link']['y'], poles=[[p['id'], p.get('name', p['id']), p['mw']] for p in grid['link']['poles']]),
         hvac=dict(name=grid['hvac']['name'], station=grid['hvac']['station'], mainland=grid['hvac']['mainland'], cables=grid['hvac']['cables'],
                   stages=[dict(date=label(st['minute']).rsplit(' · ', 1)[0], cables=st['cables'], mw=st['mw']) for st in grid['hvac']['stages']]),
@@ -79,7 +80,7 @@ def snapshot(world, since_log=0):
                     link=r(f.get('link', 0.)), link_cap=r(N.link_capacity(world), 1), link_dc=r(f.get('link_dc', f.get('link', 0.))),
                     link_ac=r(f.get('link_ac', 0.)), cap_dc=r(N.hvdc_capacity(world), 1), cap_ac=r(N.hvac_capacity(world), 1),
                     reference='AC mainland' if grid['source_bus'] == 'mainland_ac' else 'HVDC converter', battery=r(sum(storage.values())),
-                    losses=r(f.get('losses', 0.)), price=r(world.energy_price(world.minute), 3),
+                    oil=r(sum(f.get('oil',{}).values())), losses=r(f.get('losses', 0.)), price=r(world.energy_price(world.minute), 3),
                     tariff=r(world.tariff('household', world.minute), 3), energized=len(energized), buses=len(grid['buses'])),
         buses={b: [r(f.get('vm', {}).get(b, 0.), 4), r(f.get('va', {}).get(b, 0.), 2), b in energized] for b in grid['buses']},
         branches={b: branch_state(world, b, br, f) for b, br in grid['branches'].items()},
@@ -145,6 +146,7 @@ def entity(world, eid):
         t = grid['turbines'][eid]
         model = TURBINE_MODELS[t['model']]
         return dict(type='turbine', id=eid, title=f"{eid.upper()} · {t['model']}", model=t['model'], mw=t['mw'], rotor=t['rotor'],
+                    q=t.get('q',0.),reactive=reactive(t),
                     hub=t['hub'], farm=grid['farms'][t['farm']]['name'], status=t['status'], p=r(t['p']), hub_wind=r(t.get('v', 0.), 2),
                     age=r(t['age'] + (world.minute/525600), 1), maintained=label(t['maintained']) if t['maintained'] >= 0 else 'before FE 1',
                     bus_v=r(f.get('vm', {}).get(t['bus_lv'], 0.), 4), cut_in=model['cut_in'], rated_speed=model['rated_speed'],
@@ -174,6 +176,10 @@ def entity(world, eid):
         return zone_view(world, eid)
     if eid in world.firms:
         return firm_view(world, eid)
+    if eid in grid.get('oil',{}):
+        g=grid['oil'][eid]
+        return dict(type='oil',id=eid,title=g['name'],reactive=reactive(g),**{k:g[k] for k in ('state','status','mode','p_mw','p','q',
+                    'fuel_mwh','fuel_capacity','eff','starts','forming_active','energy_mwh','fuel_used','waste_heat_mwh','setpoint')})
     if eid in world.pops:
         p = world.pops[eid]
         return dict(type='pop', id=eid, title=pop_title(world, p), kind=p['kind'], group=p['group'], zone=p['zone'],
@@ -185,7 +191,8 @@ def entity(world, eid):
         s = grid['storage'][eid]
         return dict(type='storage', id=eid, title=s['name'], p_mw=s['p_mw'], e_mwh=s['e_mwh'], soc=r(s['soc'], 3), mode=s['mode'],
                     setpoint=s['setpoint'], grid_forming=s['grid_forming'], forming=bool(s.get('forming_active')), status=s['status'],
-                    p=r(f.get('storage', {}).get(eid, 0.)), throughput_mwh=r(s['cycles_mwh'], 1), actions=['storage_mode'])
+                    p=r(f.get('storage', {}).get(eid, 0.)), q=s.get('q',0.), soh=s.get('soh',1.),reactive=reactive(s),
+                    throughput_mwh=r(s['cycles_mwh'], 1), actions=['storage_mode'])
     if eid in world.substations:
         s = world.substations[eid]
         return dict(type='substation', id=eid, title=s['name'], hv_bus=s['hv_bus'], mv_bus=s['mv_bus'],
@@ -205,6 +212,10 @@ def entity(world, eid):
     if eid in world.projects:
         return dict(type='project', **project_view(world, world.projects[eid]))
     return None
+
+
+def reactive(asset):
+    return dict(mode=asset.get('q_mode','voltage'),q_setpoint=asset.get('q_setpoint',0.),v_setpoint=asset.get('v_setpoint',1.02))
 
 
 def parcel(world, x, y):

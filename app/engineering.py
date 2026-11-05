@@ -101,7 +101,7 @@ def plan_link(world, technology, p_mw, station, points=None):
 
 def plan_asset(world, target, action):
     g = world.grid
-    asset = g['turbines'].get(target) or g['storage'].get(target) or g['branches'].get(target)
+    asset = g['turbines'].get(target) or g['storage'].get(target) or g.get('oil',{}).get(target) or g['branches'].get(target)
     if not asset or target == 'hvdc' or asset.get('planned') or asset.get('retired') or asset.get('status') in ('retired','construction'):
         raise BuildError('Choose a commissioned island asset.')
     if action not in ('decommission', 'retrofit', 'maintenance'):
@@ -111,7 +111,7 @@ def plan_asset(world, target, action):
     if target in g['turbines']:
         node = g['buses'][asset['bus_lv']]
         rating = asset['mw']
-    elif target in g['storage']:
+    elif target in g['storage'] or target in g.get('oil',{}):
         node = g['buses'][asset['bus']]
         rating = asset['p_mw']
     else:
@@ -130,14 +130,14 @@ def isolate(world, target):
         br = g['branches'][target]
         br['closed'] = False
     else:
-        asset = g['turbines'].get(target) or g['storage'].get(target)
+        asset = g['turbines'].get(target) or g['storage'].get(target) or g.get('oil',{}).get(target)
         asset['status'], asset['p'], asset['forming_active'] = 'maintenance', 0., False
     world.network.dirty = True
 
 
 def finish_work(world, p):
     g, target = world.grid, p['target']
-    asset = g['turbines'].get(target) or g['storage'].get(target) or g['branches'].get(target)
+    asset = g['turbines'].get(target) or g['storage'].get(target) or g.get('oil',{}).get(target) or g['branches'].get(target)
     retired = p['action'] == 'decommission'
     asset['retired'] = retired
     if target in g['branches']:
@@ -152,8 +152,10 @@ def finish_work(world, p):
         asset['maintained'] = world.minute
         if p['action'] == 'retrofit':
             if target in g['storage']:
+                stored=asset['soc']*asset['e_mwh']
                 asset['e_mwh'] = asset.get('nominal_e_mwh', asset['e_mwh'])*1.1
                 asset['nominal_e_mwh'], asset['soh'], asset['cycles_mwh'] = asset['e_mwh'], 1., 0.
+                asset['age_hours'],asset['soc']=0.,stored/asset['e_mwh']
             else:
                 # Turbine model rating is unchanged: refurbishment restores availability/age.
                 asset['age'] = 0.
@@ -169,7 +171,7 @@ def cancel_project(world, pid):
         world.grid['turbines'][p['turbine']]['status'] = 'retired'
     if p['kind'] == 'asset_work':
         saved = p['before_work']
-        asset = world.grid['branches'].get(p['target']) or world.grid['turbines'].get(p['target']) or world.grid['storage'].get(p['target'])
+        asset = world.grid['branches'].get(p['target']) or world.grid['turbines'].get(p['target']) or world.grid['storage'].get(p['target']) or world.grid.get('oil',{}).get(p['target'])
         asset.update(saved)
     world.network.dirty = True
     return p

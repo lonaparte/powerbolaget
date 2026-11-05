@@ -1,7 +1,7 @@
 'use strict';
 // Explicit electrical endpoints and routes, alongside the map's suggested construction tools.
 PB.engineering = (() => {
-  const esc = PB.esc, kinds = ['turbine','storage','line','transformer','station','interconnector'];
+  const esc = PB.esc, kinds = ['turbine','storage','oil','line','transformer','station','interconnector'];
   function open(seed = {}) {
     const root = PB.$('dialogBody'), dialog = PB.$('dialog');
     let type = seed.type || 'line';
@@ -14,7 +14,8 @@ PB.engineering = (() => {
       let fields = '';
       if (['turbine','station'].includes(type)) fields += number('x','East (km)',30.25,-10,100)+number('y','North (km)',60.25,-10,130);
       if (type==='turbine') fields += select('model','Turbine',Object.keys(PB.static.catalog.turbines).map(k=>[k,k]),'PB-3.6')+select('connect_bus','Collector connection',[['','Suggest automatically'],...buses(33)]);
-      if (['storage','transformer','interconnector'].includes(type)) fields += select('station','Substation',subs);
+      if (['storage','oil','transformer','interconnector'].includes(type)) fields += select('station','Substation',subs);
+      if (type==='oil') fields += number('p_mw','Backup power (MW)',20,1,100)+number('fuel_hours','Fuel storage at full output (h)',48,1,720)+`<p class="small muted">Oil engine: 10 minute start, minimum run/stop 30/15 minutes, 20% minimum output, 38% efficiency. Initial and replacement fuel are billed separately.</p>`;
       if (type==='storage') fields += select('connect_bus','Connection override',[['','Use station collector'],...buses().filter(([id])=>[20,33].includes(PB.static.buses[id][1]))])+number('p_mw','Power (MW)',20,1,100)+number('hours','Energy duration (h)',2,.5,8)+`<label>Grid forming <input name="grid_forming" type="checkbox" checked></label>`;
       if (['station','transformer'].includes(type)) fields += number('mva','Transformer rating (MVA)',40,5,200);
       if (type==='station') fields += `<label>Name<input name="name" value="New substation" maxlength="60" required></label>`+select('mv_kv','Collector voltage',[[20,'20 kV'],[33,'33 kV']],20);
@@ -32,7 +33,7 @@ PB.engineering = (() => {
         e.preventDefault();
         const f = e.target, values = Object.fromEntries(new FormData(f));
         const build = {type};
-        for (const [k,v] of Object.entries(values)) if (v!=='' && !['waypoints','grid_forming','type'].includes(k)) build[k]=['x','y','p_mw','hours','mv_kv','mva'].includes(k)?Number(v):v;
+        for (const [k,v] of Object.entries(values)) if (v!=='' && !['waypoints','grid_forming','type'].includes(k)) build[k]=['x','y','p_mw','hours','mv_kv','mva','fuel_hours'].includes(k)?Number(v):v;
         if (type==='storage') build.grid_forming=f.elements.grid_forming.checked;
         if (values.waypoints?.trim()) {
           const point = id => PB.static.buses[id].slice(2,4);

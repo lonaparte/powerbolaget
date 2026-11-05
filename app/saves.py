@@ -49,8 +49,15 @@ def validate(state):
         if t.get('model') not in TURBINE_MODELS or t.get('bus_lv') not in grid['buses'] or t.get('bus_mv') not in grid['buses']:
             raise SaveError('Invalid turbine.')
     for s in grid['storage'].values():
-        if s.get('bus') not in grid['buses'] or not _num(s.get('p_mw'), 0, 1000) or not _num(s.get('e_mwh'), 0, 10000):
+        if s.get('bus') not in grid['buses'] or not _num(s.get('p_mw'), .001, 1000) or not _num(s.get('e_mwh'), .001, 10000):
             raise SaveError('Invalid battery.')
+    if not isinstance(grid.get('oil',{}),dict) or len(grid.get('oil',{}))>200:
+        raise SaveError('Invalid backup generators.')
+    for key,g in grid.get('oil',{}).items():
+        if not ID.match(key) or key!=g.get('id') or g.get('bus') not in grid['buses'] or not _num(g.get('p_mw'),.5,100):
+            raise SaveError('Invalid backup generator.')
+        if not _num(g.get('fuel_mwh'),0,1e9) or not _num(g.get('eff'),.1,.6):
+            raise SaveError('Invalid generator fuel state.')
     if grid.get('source_bus') not in grid['buses']:
         raise SaveError('Invalid source bus.')
     devices = state.get('devices')

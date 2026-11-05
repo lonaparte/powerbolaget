@@ -152,6 +152,25 @@ def link_capacity(world):
     return hvdc_capacity(world)+hvac_capacity(world)
 
 
+def sync_formers(world, t):
+    """Select a qualified reference when connections fail; capacity/SOC still limit dispatch."""
+    units=G.forming_units(world.grid)
+    islanded=link_capacity(world)<=0
+    candidates=[u for u in units if u['grid_forming'] and u['status']=='ok' and
+                (u.get('soc',0.)>.05 or (u.get('state')=='running' and u.get('fuel_mwh',0.)>0))]
+    active=next((u for u in candidates if u.get('forming_active')),None)
+    chosen=(active or max(candidates,key=lambda s:s['p_mw'],default=None)) if islanded else None
+    for u in units:
+        enable=chosen is u
+        if bool(u.get('forming_active'))!=enable:
+            world.network.set_forming(u['id'],enable)
+            world.log('protection',f"{u['name']} {'takes over' if enable else 'releases'} voltage/frequency reference",None,source=u['id'])
+    if chosen:
+        for tb in world.grid['turbines'].values():
+            if tb['grid_wait']>=1e12 and tb['bus_lv'] in world.network.energized:
+                tb['grid_wait']=t+8
+
+
 def dispatch(world, t, requests, avail):
     """Decide served fractions, turbine set points and storage power for one minute.
     requests: {device: (P, Q)}; avail: {turbine: MW}. Returns (served, turbine_mw, storage_mw)."""
@@ -183,10 +202,13 @@ def dispatch(world, t, requests, avail):
     islanded = cap <= 0
     storage = {sid: s for sid, s in grid['storage'].items() if s['status'] == 'ok' and s['bus'] in energized}
     st_mw = {sid: 0. for sid in grid['storage']}
-    need = load+losses-w_total
+    oil=sum(g['p'] for g in grid.get('oil',{}).values() if g['status']=='ok' and g['state']=='running'
+            and not g.get('forming_active') and g['bus'] in energized)
+    need = load+losses-w_total-oil
     price, avg = world.energy_price(t), world.price_avg
     for sid, s in storage.items():
         st_mw[sid] = storage_setpoint(s, need, imp_cap, exp_cap, price, avg, islanded)
+    engine = next((s for s in grid.get('oil',{}).values() if s.get('forming_active')),None)
     former = next((sid for sid, s in storage.items() if s.get('forming_active')), None)
     if islanded and former:
         # The grid-forming battery is the island's slack: it covers the residual within its limits.
@@ -200,6 +222,15 @@ def dispatch(world, t, requests, avail):
         elif residual < -ch_max:
             curtail(wind, -ch_max-residual)
         link = 0.
+    elif islanded and engine:
+        residual=need-sum(st_mw.values())
+        maximum=min(engine['p_mw'],engine['fuel_mwh']*engine['eff']*60)
+        minimum=.2*engine['p_mw']
+        if residual>maximum:
+            shed(by_class,requests,served,residual-maximum)
+        elif residual<minimum:
+            curtail(wind,minimum-residual)
+        link=0.
     elif islanded:
         link = 0.
     else:

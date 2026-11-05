@@ -211,6 +211,21 @@ Three views (island, grid, economy), map layers, a context inspector, parcel det
 Calibrated economic coefficients, tariff pass-through, the turbine dynamic model, HVAC and HVDC control choices, construction costs and durations, and load calibration against public annual statistics are all open. UI usability with students is still to be tested.
 # Confirmed retail and private finance rules
 
+Backup generation is fuel oil only. New synchronous engines take ten minutes to start, have
+30/15-minute minimum up/down times, a 20% minimum output and 20%-of-rating/minute ramp. Automatic
+backup starts for a capacity deficit; a running black-start unit can form an island after a blackout.
+Thermal oil stock, consumed fuel, electricity and waste heat are separate quantities at 38% efficiency.
+The synthetic delivered oil price is 950 SEK/thermal MWh; starting costs 8,000 SEK/MW. Daily automatic
+reordering below 25% inventory is visible in the ledger. These coefficients require sensitivity checks.
+
+Wind and battery converters support fixed Q or voltage droop with a bounded 1.1-pu apparent-power
+circle and voltage-dependent current limit. The conservative steady-state droop slope is 0.5 pu Q/pu V;
+the feedback voltage is saved, so reloading cannot reset the controller. An engine's stator capability
+uses the same first-release circle approximation. This is not a claim of detailed machine capability.
+Storage energy capacity fades 1.5%/year and 20% per 6,000 equivalent cycles; cells retire at 80% SOH.
+Fade preserves absolute stored energy except explicitly recorded excess beyond the reduced capacity.
+Battery replacement restores SOH/age and preserves stored MWh. Dynamic controls are validated separately.
+
 The engineering dialog supports independent 110/20 or 110/33 kV stations, transformer sizing,
 electrical bus selection, 20/33/110 kV lines and routed collector cables. Route length enters both
 impedance and cost; voltage mismatch and overhead sea crossings are rejected. A new station is

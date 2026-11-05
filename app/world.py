@@ -26,6 +26,7 @@ from . import society as S
 from . import weather as W
 from . import retail as R
 from . import finance as F
+from . import generation as O
 from .calendar import DAY, HOUR, is_rest_day, label, month_index, parts, stamp
 from .events import EventQueue
 from .ledger import Ledger
@@ -111,6 +112,7 @@ class World:
         self.retail_version = s.get('retail_version', 1)
         self.contracts = s.get('contracts', {})
         self.price_observations = s.get('price_observations', dict(sum=0., hours=0))
+        self.grid.setdefault('oil',{})
         self.events.cancel(lambda e: e['kind'] == 'interconnector')
         legacy = self.projects.get('tso_hvac')
         if legacy and legacy['status'] == 'building':
@@ -144,7 +146,7 @@ class World:
     @staticmethod
     def _blank_acc():
         return dict(load_req=0., load_srv=0., wind_avail=0., wind=0., link_import=0., link_export=0., battery_dis=0.,
-                    battery_ch=0., losses=0., minutes=0., vmin=2., unserved_zone={}, maxload=0., import_cost=0.,
+                    battery_ch=0., oil=0., losses=0., minutes=0., vmin=2., unserved_zone={}, maxload=0., import_cost=0.,
                     export_revenue=0.)
 
     def island_name(self):
@@ -278,6 +280,8 @@ class World:
             self.network.compile()
         reqs = self.requests(t, w)
         avail = N.available_wind(self, t, w)
+        O.step(self,t,reqs,avail)
+        N.sync_formers(self,t)
         wind_avail = sum(p for tid, p in avail.items() if self.grid['turbines'][tid]['bus_lv'] in self.network.energized)
         for s in self.grid['storage'].values():
             if s.get('forming_active') and s['soc'] <= .02:
@@ -308,12 +312,28 @@ class World:
 
     def _power_flow(self, reqs, served, turb, st):
         loads = {did: (p*served[did], q*served[did]) for did, (p, q) in reqs.items()}
-        gens = {tid: (turb.get(tid, 0.), 0.) for tid, tb in self.grid['turbines'].items() if tb['status'] != 'construction'}
+        gens = {}
+        vm=(self.flows or {}).get('vm',{})
+        for tid,tb in self.grid['turbines'].items():
+            if tb['status']!='construction':
+                pq=O.injection(tb,turb.get(tid,0.),vm.get(tb['bus_lv'],tb.get('vm',1.))) if tb['status']=='ok' and tb['grid_wait']<=self.t_now else (0.,0.)
+                gens[tid]=pq
+                if tid in turb:
+                    turb[tid]=pq[0]
+                tb['q']=pq[1]
         if self.grid['source_bus'] == 'mainland_ac':
             gens['hvdc_conv'] = (getattr(self, 'hvdc_setpoint', 0.), 0.)
         for sid, s in self.grid['storage'].items():
             if s['status'] != 'construction':
-                gens[sid] = (0. if s.get('forming_active') else st.get(sid, 0.), 0.)
+                gens[sid] = (0.,0.) if s.get('forming_active') or s['status']!='ok' else O.injection(s,st.get(sid,0.),vm.get(s['bus'],s.get('vm',1.)))
+                st[sid]=gens[sid][0]
+                s['q']=gens[sid][1]
+        for gid,g in self.grid.get('oil',{}).items():
+            p=g['p'] if g['status']=='ok' and g['state']=='running' and g['bus'] in self.network.energized else 0.
+            gens[gid]=(0.,0.) if g.get('forming_active') else O.injection(g,p,vm.get(g['bus'],g.get('vm',1.)))
+            g['q']=gens[gid][1]
+            if not g.get('forming_active'):
+                g['p']=gens[gid][0]
         t0 = _time.perf_counter()
         try:
             res = self.network.solve(loads, gens)
@@ -335,6 +355,13 @@ class World:
             return
         self.last_losses = res.losses_mw
         storage = dict(st)
+        oil={gid:(res.formers.get(gid+'_gf',(0.,0.))[0] if g.get('forming_active') else
+                  g['p'] if g['state']=='running' and g['status']=='ok' and g['bus'] in self.network.energized else 0.)
+             for gid,g in grid.get('oil',{}).items()}
+        for gid,p in oil.items():
+            grid['oil'][gid]['p']=p
+            if grid['oil'][gid].get('forming_active'):
+                grid['oil'][gid]['q']=res.formers.get(gid+'_gf',(0.,0.))[1]
         for sid, s in grid['storage'].items():
             if s.get('forming_active'):
                 name = sid+'_gf'
@@ -353,7 +380,7 @@ class World:
         ac = res.source_p_mw if self.grid['source_bus'] == 'mainland_ac' else 0.
         self.flows = dict(t=t, link=dc+ac, link_dc=dc, link_ac=ac, link_q=res.source_q_mvar, losses=res.losses_mw, storage=storage,
                           loading=loading, branches=res.branches, vm=res.bus_vm, va=res.bus_va,
-                          dev={did: (reqs[did][0], served[did]) for did in reqs}, turb=dict(turb))
+                          dev={did: (reqs[did][0], served[did]) for did in reqs}, turb=dict(turb),oil=oil)
         for did, (p, q) in reqs.items():
             d = self.devices[did]
             d['p'], d['q'], d['served'] = p, q, served[did]
@@ -364,6 +391,8 @@ class World:
                              self.firms[d['owner'][1]]['zone'], device=did)
         for tid, p in turb.items():
             grid['turbines'][tid]['p'] = p
+        for asset in list(grid['turbines'].values())+G.forming_units(grid):
+            asset['vm']=res.bus_vm.get(asset.get('bus_lv',asset.get('bus')),0.)
         self.tap_control(res)
         # Protection: thermal overloads and turbine voltage ride-through limits.
         for bid in N.overload_check(self, t, loading):
@@ -448,6 +477,9 @@ class World:
                 acc['battery_ch'] -= p*h
             s['p'] = p
             s['cycles_mwh'] += abs(p)*h
+            O.age_storage(s,h)
+        O.integrate(self,h,f.get('oil',{}))
+        acc['oil']=acc.get('oil',0.)+sum(f.get('oil',{}).values())*h
         price = self.energy_price(t_from)
         if f['link'] >= 0:
             acc['link_import'] += f['link']*h
@@ -648,19 +680,15 @@ class World:
         hv['tripped'] = True
         hv['fault'] = 'both link poles out'
         self.network.switch('hvdc')
-        formers = [s for s in self.grid['storage'].values() if s['grid_forming'] and s['status'] == 'ok' and s['soc'] > .1]
-        if formers:
-            best = max(formers, key=lambda s: s['p_mw'])
-            self.network.set_forming(best['id'], True)
-            self.log('protection', f"Mainland link lost: {best['name']} now forms the island grid", None, storage=best['id'])
-        else:
+        N.sync_formers(self,t)
+        if not any(s.get('forming_active') for s in G.forming_units(self.grid)):
             self.log('protection', 'Mainland link lost: no grid-forming source, island blackout', None)
         self.grid_lost_turbines(t)
 
     def reconnect_link(self, t):
         hv = self.grid['branches']['hvdc']
         hv['tripped'], hv['fault'] = False, None
-        for s in self.grid['storage'].values():
+        for s in G.forming_units(self.grid):
             if s.get('forming_active'):
                 self.network.set_forming(s['id'], False)
         self.network.switch('hvdc')
@@ -806,6 +834,7 @@ class World:
             wind=round(acc['wind'], 3), wind_avail=round(acc['wind_avail'], 3),
             link_import=round(acc['link_import'], 3), link_export=round(acc['link_export'], 3),
             battery=round(acc['battery_dis']-acc['battery_ch'], 3), losses=round(acc['losses'], 3),
+            oil=round(acc.get('oil',0.),3),
             price=round(price, 4), temp=round(self.weather_now['temperature_c'], 2), wind10=round(self.weather_now['wind_10m_ms'], 2),
             tourists=sum(st['zone_tourists'].values()), holiday=sum(st['zone_holiday'].values()),
             residents=sum(st['zone_residents'].values()), unemployed=sum(st['zone_unemployed'].values()),
@@ -867,6 +896,7 @@ class World:
             led.transfer('financing', 'pb', -led.balance('pb')+20e6, 'external financing', m)
             self.log('finance', 'Cash shortfall covered by external financing (free-investment rule)', None)
         F.close_day(self, m)
+        O.refuel(self,m)
         E.close_day(self, m)
         for z in self.zones:
             self.outage.setdefault(z['id'], deque(maxlen=120)).append(round(self.outage_today.get(z['id'], 0.), 3))
@@ -1019,6 +1049,19 @@ def command(world, cmd):
         except C.BuildError as exc:
             raise CommandError(str(exc))
         result = plan['title']+' started'
+    elif kind == 'generator_mode':
+        g=world.grid.get('oil',{}).get(cmd['target'])
+        if not g or cmd.get('mode') not in ('auto','off','on'):
+            raise CommandError('Choose an oil generator and auto/off/on mode.')
+        g['mode']=cmd['mode']
+        g['setpoint']=min(g['p_mw'],max(.2*g['p_mw'],float(cmd.get('setpoint') or g['p_mw'])))
+        result=g['name']+': '+g['mode']
+    elif kind == 'reactive_control':
+        asset=world.grid['turbines'].get(cmd['target']) or world.grid['storage'].get(cmd['target']) or world.grid.get('oil',{}).get(cmd['target'])
+        if not asset or cmd.get('q_mode') not in ('voltage','fixed'):
+            raise CommandError('Choose a generator/battery and fixed-Q or voltage control.')
+        asset.update(q_mode=cmd['q_mode'],q_setpoint=float(cmd.get('q_setpoint') or 0.),v_setpoint=float(cmd.get('v_setpoint') or 1.02))
+        result='Reactive control updated; capability and current limits apply'
     elif kind == 'cancel_project':
         from . import engineering as X
         try:
@@ -1040,7 +1083,7 @@ def plan_build(world, b):
     from . import engineering as X
     typ = b.pop('type')
     required = dict(turbine=('model','x','y'), storage=('p_mw','hours'), line=('a','b'),
-                    transformer=('station',), station=('x','y'), interconnector=('technology','p_mw','station'))
+                    transformer=('station',), station=('x','y'), interconnector=('technology','p_mw','station'),oil=('p_mw',))
     if any(b.get(k) is None for k in required.get(typ, ())):
         raise C.BuildError('Complete the required fields for this project.')
     if typ == 'turbine':
@@ -1055,4 +1098,6 @@ def plan_build(world, b):
         return X.plan_station(world, b['x'], b['y'], b.get('mv_kv', 20.), b.get('mva', 40.), b.get('name'))
     if typ == 'interconnector':
         return X.plan_link(world, b['technology'], b['p_mw'], b['station'], b.get('route'))
+    if typ == 'oil':
+        return O.plan(world,b.get('station'),b['p_mw'],b.get('fuel_hours',48.),b.get('connect_bus'))
     raise C.BuildError('Unknown project type.')

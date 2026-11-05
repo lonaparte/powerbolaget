@@ -80,7 +80,7 @@ def update_source(grid):
 def energized(grid):
     """Buses connected to a voltage source: the mainland link, or an enabled grid-forming battery."""
     roots = [grid['source_bus']]
-    roots += [s['bus'] for s in grid['storage'].values() if s.get('forming_active')]
+    roots += [s['bus'] for s in forming_units(grid) if s.get('forming_active')]
     adjacency = {}
     for br in grid['branches'].values():
         if in_service(br):
@@ -93,6 +93,10 @@ def energized(grid):
                 seen.add(nxt)
                 stack.append(nxt)
     return seen
+
+
+def forming_units(grid):
+    return list(grid['storage'].values())+list(grid.get('oil',{}).values())
 
 
 def model(grid, devices):
@@ -121,6 +125,10 @@ def model(grid, devices):
             elements.append(Generator(s['id'], s['bus'], kv, s['p_mw']*1100))
             if s['grid_forming']:
                 elements.append(GridFormer(s['id']+'_gf', s['bus'], kv, max(50., 6*s['p_mw'])))
+    for g in grid.get('oil',{}).values():
+        kv=grid['buses'][g['bus']]['kv']
+        elements.append(Generator(g['id'],g['bus'],kv,g['p_mw']*1100))
+        elements.append(GridFormer(g['id']+'_gf',g['bus'],kv,max(20.,5*g['p_mw'])))
     if ac_source:
         mw = sum(p['mw'] for p in grid['link']['poles'])
         elements.append(Generator('hvdc_conv', grid['link']['bus'], 110., mw*1100))
@@ -151,7 +159,7 @@ class Network:
                 self.solver.set_enabled('transformer', br['id'], False)
             if br['kind'] == 'transformer' and br.get('tap', 1.0) != 1.0:
                 self.solver.set_tap(br['id'], br['tap'])
-        for s in self.grid['storage'].values():
+        for s in forming_units(self.grid):
             if s['grid_forming'] and s['status'] != 'construction' and s.get('forming_active'):
                 self.solver.set_enabled('vsource', s['id']+'_gf', True)
         self.energized = energized(self.grid)
@@ -177,7 +185,7 @@ class Network:
             self.solver.set_tap(branch_id, tap)
 
     def set_forming(self, storage_id, active):
-        s = self.grid['storage'][storage_id]
+        s = self.grid['storage'].get(storage_id) or self.grid.get('oil',{})[storage_id]
         s['forming_active'] = bool(active)
         if self.solver is not None and s['grid_forming']:
             self.solver.set_enabled('vsource', storage_id+'_gf', bool(active))

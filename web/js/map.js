@@ -349,6 +349,10 @@ PB.map = (() => {
     }
   }
   function drawStorage(s, st) {
+    for (const [id,g] of Object.entries(st.oil || {})) {
+      const [x,y]=toPx(g[1],g[2]);
+      R(x-3,y-3,7,7,css('--edge'));R(x-2,y-2,5,5,css('--orange'));
+    }
     for (const [id, b] of Object.entries(st.storage)) {
       const [px, py] = toPx(b[2], b[3]), v = s.storage[id] || [0, 0, 'construction'];
       R(px - 3, py - 2, 8, 5, css('--edge'));
@@ -381,6 +385,7 @@ PB.map = (() => {
     if (st.turbines[id]) return [st.turbines[id][1], st.turbines[id][2], 8];
     if (st.substations[id]) return [st.substations[id][1], st.substations[id][2], 6];
     if (st.storage[id]) return [st.storage[id][2], st.storage[id][3], 6];
+    if (st.oil?.[id]) return [st.oil[id][1],st.oil[id][2],6];
     if (st.buses[id]) return [st.buses[id][2], st.buses[id][3], 5];
     if (st.branches[id]) { const b = st.branches[id], A = st.buses[b[0]], B = st.buses[b[1]]; return [(A[2] + B[2]) / 2, (A[3] + B[3]) / 2, 5]; }
     const z = st.zones.find(z => z.id === id); if (z) return [z.x, z.y, 10];
@@ -420,7 +425,7 @@ PB.map = (() => {
       }
       const t = s.totals, first = st.hvac.stages[0];
       add(st.island.mainland[0] + 30, st.island.mainland[1] + 2.5, `← HVDC ${st.link.poles.length}×${PB.int(st.link.poles[0][2])} MW`, 'small', true);
-      add(st.hvac.mainland[0] + 30, st.hvac.mainland[1] + 6.5, t.cap_ac > 0 ? `← HVAC 220 kV · ${PB.int(t.cap_ac)} MW` : `← HVAC 220 kV · planned ${first.date}`, 'small', true);
+      add(st.hvac.mainland[0] + 30, st.hvac.mainland[1] + 6.5, t.cap_ac > 0 ? `← HVAC 220 kV · ${PB.int(t.cap_ac)} MW` : '← HVAC 220 kV · player project', 'small', true);
       if (view.z >= 4) add(st.hvac.station[0] + 1.5, st.hvac.station[1] - 1.2, st.hvac.name.toUpperCase(), 'small');
     } else if (layers.grid.labels) {
       for (const [id, x] of Object.entries(st.substations)) { const v = s.buses[x[3]]; add(x[1], x[2] + 2.2, `${x[0].toUpperCase()} ${v ? PB.fmt(v[0], 3) : ''}`); }
@@ -437,6 +442,7 @@ PB.map = (() => {
     const consider = (id, x, y, r) => { const [qx, qy] = toPx(x, y), d = Math.hypot(qx - px, qy - py); if (d <= r && d < bd) { bd = d; best = id; } };
     for (const [id, t] of Object.entries(st.turbines)) consider(id, t[1], t[2], view.z >= 3.2 ? 5 : 3);
     for (const [id, b] of Object.entries(st.storage)) consider(id, b[2], b[3], 5);
+    for (const [id,g] of Object.entries(st.oil || {})) consider(id,g[1],g[2],5);
     for (const [id, x] of Object.entries(st.substations)) consider(id, x[1], x[2], 5);
     consider('link', st.link.x, st.link.y, 6);
     consider('link', st.hvac.station[0], st.hvac.station[1], 6);

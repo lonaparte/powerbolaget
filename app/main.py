@@ -98,7 +98,7 @@ class Tick(Ref):
 
 class Build(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    type: Literal['turbine', 'storage', 'line', 'transformer', 'station', 'interconnector']
+    type: Literal['turbine', 'storage', 'line', 'transformer', 'station', 'interconnector', 'oil']
     model: Optional[str] = Field(default=None, max_length=12)
     x: Optional[float] = Field(default=None, ge=-60, le=160)
     y: Optional[float] = Field(default=None, ge=-60, le=160)
@@ -110,6 +110,7 @@ class Build(BaseModel):
     mv_kv: Literal[20, 33] = 20
     mva: float = Field(default=40., ge=5, le=200)
     technology: Literal['HVDC', 'HVAC'] = 'HVAC'
+    fuel_hours: float = Field(default=48., ge=1, le=720)
     hours: Optional[float] = Field(default=None, ge=.5, le=8)
     grid_forming: bool = False
     a: Optional[str] = Field(default=None, pattern=ID)
@@ -130,14 +131,17 @@ class RetailPolicy(BaseModel):
 class Command(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_id: Optional[str] = Field(default=None, min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
-    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings', 'retail_policy', 'asset_work', 'cancel_project']
+    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings', 'retail_policy', 'asset_work', 'cancel_project', 'generator_mode', 'reactive_control']
     action: Optional[Literal['decommission','retrofit','maintenance']] = None
     category: Optional[Literal['household', 'industry', 'business']] = None
     policy: Optional[RetailPolicy] = None
     build: Optional[Build] = None
     target: Optional[str] = Field(default=None, pattern=ID)
     closed: Optional[bool] = None
-    mode: Optional[Literal['auto', 'hold', 'charge', 'discharge']] = None
+    mode: Optional[Literal['auto', 'hold', 'charge', 'discharge', 'off', 'on']] = None
+    q_mode: Optional[Literal['voltage', 'fixed']] = None
+    q_setpoint: Optional[float] = Field(default=None, ge=-1000, le=1000)
+    v_setpoint: Optional[float] = Field(default=None, ge=.95, le=1.05)
     setpoint: Optional[float] = Field(default=None, ge=0, le=1000)
     link_margin: Optional[float] = Field(default=None, ge=0, le=.3)
 

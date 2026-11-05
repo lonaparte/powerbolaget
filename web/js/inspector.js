@@ -100,11 +100,13 @@ PB.inspector = (() => {
         + `<p class="small muted">A POP is a group with a count, not a person. Moves, births, deaths and jobs change the counts.</p>`;
     } else if (d.type === 'storage') {
       html = head(`Battery${d.grid_forming ? ' · grid-forming' : ''}`, d.title, d.status) + kv([['Power now', PB.mw(d.p) + (d.p > 0 ? ' discharging' : d.p < 0 ? ' charging' : '')],
-        ['Rating', `${PB.mw(d.p_mw)} / ${PB.fmt(d.e_mwh, 0)} MWh`], ['State of charge', PB.pct(d.soc, 1)], ['Mode', d.mode], ['Forming the island grid', d.forming ? 'yes' : 'no'], ['Energy throughput', PB.fmt(d.throughput_mwh, 0) + ' MWh']])
+        ['Rating', `${PB.mw(d.p_mw)} / ${PB.fmt(d.e_mwh, 0)} MWh`], ['State of health',PB.pct(d.soh,1)], ['State of charge', PB.pct(d.soc, 1)], ['Mode', d.mode], ['Forming the island grid', d.forming ? 'yes' : 'no'], ['Energy throughput', PB.fmt(d.throughput_mwh, 0) + ' MWh']])
         + bar(d.soc) + `<h3>OPERATION</h3><label class="small">Mode <select id="bmode">${['auto', 'hold', 'charge', 'discharge'].map(m => `<option ${m === d.mode ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
         <label class="small">Set point (MW) <input id="bset" type="number" min="0" max="${d.p_mw}" step="1" value="${d.setpoint || d.p_mw}"></label>
         <div class="actions"><button class="button primary" data-cmd="storage">Apply</button>${pin(d.id)}</div>
         <p class="small muted">Auto: shaves import peaks, absorbs surplus wind and follows price. A grid-forming battery can carry the island when the link is lost.</p>`;
+    } else if (d.type === 'oil') {
+      html=head('Oil backup',d.title,d.state)+kv([['Power',PB.mw(d.p)],['Reactive power',PB.fmt(d.q,2)+' Mvar'],['Rating',PB.mw(d.p_mw)],['Fuel',PB.fmt(d.fuel_mwh,1)+' / '+PB.fmt(d.fuel_capacity,1)+' MWh thermal'],['Efficiency',PB.pct(d.eff)],['Voltage reference',d.forming_active?'forming':'following'],['Starts',d.starts],['Fuel consumed',PB.fmt(d.fuel_used,2)+' MWh'],['Electricity / waste heat',PB.fmt(d.energy_mwh,2)+' / '+PB.fmt(d.waste_heat_mwh,2)+' MWh']])+`<label>Mode<select id="omode">${['auto','off','on'].map(m=>`<option ${m===d.mode?'selected':''}>${m}</option>`).join('')}</select></label><label>Setpoint (MW)<input id="oset" type="number" min="0" max="${d.p_mw}" value="${d.setpoint}"></label><button class="button" data-cmd="oil">Apply</button><p class="small muted">Automatic backup starts when mainland capacity is insufficient. Fuel is reordered daily below 25% storage.</p>`;
     } else if (d.type === 'link') {
       const ac = d.hvac, dc = d.hvdc;
       html = head('Connections to the mainland', d.title, null) + kv([['Exchange', `${PB.fmt(d.p, 1)} MW ${d.p >= 0 ? 'import' : 'export'}`], ['Available capacity', PB.mw(d.capacity)],
@@ -132,11 +134,14 @@ PB.inspector = (() => {
     } else if (d.type === 'project') {
       html = head(`Project · ${d.kind}`, d.title, null) + bar(d.progress) + kv([['Progress', PB.pct(d.progress)], ['Ready', PB.esc(d.finish)], ['Cost / paid', `${PB.msek(d.cost)} / ${PB.msek(d.paid)}`]]);
     }
-    if (['turbine','storage','branch'].includes(d.type) && d.id!=='hvdc') html += `<h3>ASSET WORK</h3><div class="actions">${['maintenance','retrofit','decommission'].map(a=>`<button class="button" data-work="${a}">${a}</button>`).join('')}</div><p class="small muted">Work locks the asset out. View cost and completion in projects; cancel an active order there.</p>`;
+    if (['turbine','storage','oil','branch'].includes(d.type) && d.id!=='hvdc') html += `<h3>ASSET WORK</h3><div class="actions">${['maintenance','retrofit','decommission'].map(a=>`<button class="button" data-work="${a}">${a}</button>`).join('')}</div><p class="small muted">Work locks the asset out. View cost and completion in projects; cancel an active order there.</p>`;
+    if (['turbine','storage','oil'].includes(d.type)) html += `<h3>REACTIVE CONTROL</h3><label>Mode<select id="qmode"><option value="voltage">Voltage droop</option><option value="fixed">Fixed Mvar</option></select></label><label>Voltage setpoint (pu)<input id="vset" type="number" min=".95" max="1.05" step=".005" value="1.02"></label><label>Q setpoint (Mvar)<input id="qset" type="number" step=".1" value="0"></label><button class="button" id="applyQ">Apply P/Q control</button><p class="small muted">Apparent power and voltage-dependent current limits bound active and reactive output.</p>`;
     if (d.type==='project' && d.status==='building') html += `<button class="button" id="cancelProject">Cancel project</button>`;
     el.innerHTML = `<button class="button" data-back="1" style="float:right">✕</button>` + html;
     el.querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>PB.command({kind:'asset_work',target:d.id,action:b.dataset.work}));
     el.querySelector('#cancelProject')?.addEventListener('click',()=>PB.command({kind:'cancel_project',target:d.id}));
+    el.querySelector('#applyQ')?.addEventListener('click',()=>PB.command({kind:'reactive_control',target:d.id,q_mode:PB.$('qmode').value,q_setpoint:Number(PB.$('qset').value),v_setpoint:Number(PB.$('vset').value)}));
+    if (d.reactive) {PB.$('qmode').value=d.reactive.mode;PB.$('qset').value=d.reactive.q_setpoint;PB.$('vset').value=d.reactive.v_setpoint;}
     el.querySelector('#linkEngineering')?.addEventListener('click', () => PB.engineering.open({type:'interconnector'}));
     el.querySelectorAll('canvas.mini').forEach(c => {
       const kind = c.dataset.hist, h = d.history || [];
@@ -167,6 +172,7 @@ PB.inspector = (() => {
     const cmd = c === 'maintenance' ? {kind: 'maintenance', target: d.id}
       : c === 'switch' ? {kind: 'switch', target: d.id, closed: d.status === 'open'}
       : c === 'storage' ? {kind: 'storage_mode', target: d.id, mode: PB.$('bmode').value, setpoint: Number(PB.$('bset').value)}
+      : c === 'oil' ? {kind:'generator_mode',target:d.id,mode:PB.$('omode').value,setpoint:Number(PB.$('oset').value)}
       : c === 'margin' ? {kind: 'settings', link_margin: Number(PB.$('lmargin').value) / 100} : null;
     if (cmd) await PB.command(cmd);
   });

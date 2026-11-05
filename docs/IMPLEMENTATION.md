@@ -55,3 +55,8 @@ without a public source are assumptions and must be visible as such in the model
   constraints; legacy scheduled delivery removed; asset lockout, work, cancellation and retirement.
   Validation: 38 Python tests and all 4 browser workflows passed. Oil backup, storage aging and
   electrical event dynamics remain in the following batches.
+- Batch 3b: synchronous fuel-oil backup with start/ramp/up/down/fuel/black-start constraints and
+  fuel/heat accounting; qualified source handover; fixed-Q/voltage control bounded by P/Q/current
+  capability; storage calendar/cycle fade and replacement/retirement. Initial voltage-control gain
+  was rejected by regression testing and reduced; controller feedback is persisted. Validation:
+  all 42 Python tests and all 4 browser workflows passed.

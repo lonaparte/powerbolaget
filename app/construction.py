@@ -142,7 +142,7 @@ def start(world, plan):
     if plan['kind'] == 'asset_work':
         from . import engineering as X
         target = plan['target']
-        asset = world.grid['branches'].get(target) or world.grid['turbines'].get(target) or world.grid['storage'].get(target)
+        asset = world.grid['branches'].get(target) or world.grid['turbines'].get(target) or world.grid['storage'].get(target) or world.grid.get('oil',{}).get(target)
         project['before_work'] = {k:asset[k] for k in ('status','closed') if k in asset}
         X.isolate(world, target)
     world.events.push(project['finish'], 'commission', 'commission', project=pid)
@@ -196,6 +196,9 @@ def commission(world, pid):
     elif kind in ('station', 'interconnector', 'asset_work'):
         from . import engineering as X
         X.commission(world, p)
+    elif kind == 'oil':
+        from . import generation as O
+        O.add(world,p)
     grid['version'] = grid.get('version', 0)+1
     if getattr(world, 'network', None):
         world.network.dirty = True

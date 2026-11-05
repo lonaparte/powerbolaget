@@ -179,6 +179,7 @@ PB.name = id => {
   if (st.firms[id]) return st.firms[id][0];
   if (st.substations[id]) return st.substations[id][0];
   if (st.storage[id]) return st.storage[id][0];
+  if (st.oil?.[id]) return st.oil[id][0];
   const z = st.zones.find(z => z.id === id); if (z) return z.name;
   if (id === 'link') return 'Mainland link';
   if (id.startsWith('parcel_')) return 'Parcel ' + id.slice(7).replace('_', '·');
