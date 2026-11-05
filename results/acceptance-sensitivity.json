@@ -1,0 +1,278 @@
+{
+  "git_commit": "d0ad0579773ae2470a4d4a7dbc52a62c57c4b212",
+  "python": "3.12.14",
+  "processor": "AMD EPYC 9V74 80-Core Processor",
+  "method": "One-at-a-time isolated subprocesses; seed 1; identical first three winter days; no player actions",
+  "scope": "Short-run local sensitivity, not annual macro calibration or uncertainty probabilities",
+  "cases": [
+    {
+      "name": "baseline",
+      "days": 3,
+      "load_mwh": 9681.48,
+      "served_mwh": 9681.48,
+      "unserved_mwh": 0,
+      "wind_mwh": 5383.91,
+      "import_mwh": 4801.45,
+      "export_mwh": 90.22,
+      "losses_mwh": 413.655779,
+      "peak_mw": 176.0,
+      "pb_cash_msek": 403.3655841402353,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -5.170470103621483e-06,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 1.0118128557223827e-10
+    },
+    {
+      "name": "demand_low",
+      "days": 3,
+      "load_mwh": 9090.02,
+      "served_mwh": 9090.02,
+      "unserved_mwh": 0,
+      "wind_mwh": 5383.91,
+      "import_mwh": 4238.63,
+      "export_mwh": 149.94,
+      "losses_mwh": 382.583992,
+      "peak_mw": 164.47,
+      "pb_cash_msek": 403.3191264336645,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -5.980837158858776e-06,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 1.0822986951097846e-10,
+      "change_from_baseline_pct": {
+        "load_mwh": -6.109189917244051,
+        "wind_mwh": 0.0,
+        "import_mwh": -11.721875683387307,
+        "losses_mwh": -7.511508016427337,
+        "peak_mw": -6.551136363636367,
+        "pb_cash_msek": -0.0115175186970351
+      }
+    },
+    {
+      "name": "demand_high",
+      "days": 3,
+      "load_mwh": 10272.96,
+      "served_mwh": 10272.96,
+      "unserved_mwh": 0,
+      "wind_mwh": 5383.91,
+      "import_mwh": 5388.95,
+      "export_mwh": 48.29,
+      "losses_mwh": 451.608917,
+      "peak_mw": 187.53,
+      "pb_cash_msek": 403.4057240406404,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -8.557341061532497e-06,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 1.3073986337985843e-10,
+      "change_from_baseline_pct": {
+        "load_mwh": 6.109396497229769,
+        "wind_mwh": 0.0,
+        "import_mwh": 12.235887075779184,
+        "losses_mwh": 9.175053251220277,
+        "peak_mw": 6.551136363636356,
+        "pb_cash_msek": 0.009951245714390211
+      }
+    },
+    {
+      "name": "thermal_low",
+      "days": 3,
+      "load_mwh": 9228.24,
+      "served_mwh": 9228.24,
+      "unserved_mwh": 0,
+      "wind_mwh": 5383.91,
+      "import_mwh": 4379.83,
+      "export_mwh": 145.75,
+      "losses_mwh": 389.770236,
+      "peak_mw": 167.99,
+      "pb_cash_msek": 403.3096920924943,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -5.395500920712948e-06,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 1.496118784416467e-10,
+      "change_from_baseline_pct": {
+        "load_mwh": -4.681515636039113,
+        "wind_mwh": 0.0,
+        "import_mwh": -8.78109737683408,
+        "losses_mwh": -5.774255845704013,
+        "peak_mw": -4.551136363636354,
+        "pb_cash_msek": -0.013856424528668754
+      }
+    },
+    {
+      "name": "thermal_high",
+      "days": 3,
+      "load_mwh": 10134.76,
+      "served_mwh": 10134.76,
+      "unserved_mwh": 0,
+      "wind_mwh": 5383.91,
+      "import_mwh": 5240.6,
+      "export_mwh": 48.28,
+      "losses_mwh": 441.467267,
+      "peak_mw": 184.02,
+      "pb_cash_msek": 403.4177748238033,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -1.1551310308277607e-05,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 9.981704351957887e-11,
+      "change_from_baseline_pct": {
+        "load_mwh": 4.681928796010526,
+        "wind_mwh": 0.0,
+        "import_mwh": 9.146195420133507,
+        "losses_mwh": 6.723340857761828,
+        "peak_mw": 4.55681818181819,
+        "pb_cash_msek": 0.012938804305595575
+      }
+    },
+    {
+      "name": "wake_low",
+      "days": 3,
+      "load_mwh": 9681.48,
+      "served_mwh": 9681.48,
+      "unserved_mwh": 0,
+      "wind_mwh": 5370.82,
+      "import_mwh": 4814.91,
+      "export_mwh": 90.67999999999999,
+      "losses_mwh": 413.561988,
+      "peak_mw": 176.0,
+      "pb_cash_msek": 403.353608321823,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -5.150213837623596e-06,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 1.0982148523908108e-10,
+      "change_from_baseline_pct": {
+        "load_mwh": 0.0,
+        "wind_mwh": -0.24313185027239337,
+        "import_mwh": 0.28033198304677764,
+        "losses_mwh": -0.02267368298993766,
+        "peak_mw": 0.0,
+        "pb_cash_msek": -0.0029689737754412526
+      }
+    },
+    {
+      "name": "wake_high",
+      "days": 3,
+      "load_mwh": 9681.48,
+      "served_mwh": 9681.48,
+      "unserved_mwh": 0,
+      "wind_mwh": 5394.72,
+      "import_mwh": 4789.82,
+      "export_mwh": 89.34,
+      "losses_mwh": 413.708828,
+      "peak_mw": 176.0,
+      "pb_cash_msek": 403.37568112443506,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -5.947775207459927e-06,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 1.0231815394945443e-10,
+      "change_from_baseline_pct": {
+        "load_mwh": 0.0,
+        "wind_mwh": 0.20078344548850602,
+        "import_mwh": -0.2422184964958496,
+        "losses_mwh": 0.012824431010782789,
+        "peak_mw": 0.0,
+        "pb_cash_msek": 0.002503184356017485
+      }
+    },
+    {
+      "name": "price_low",
+      "days": 3,
+      "load_mwh": 9681.48,
+      "served_mwh": 9681.48,
+      "unserved_mwh": 0,
+      "wind_mwh": 5383.91,
+      "import_mwh": 4801.45,
+      "export_mwh": 90.22,
+      "losses_mwh": 413.655779,
+      "peak_mw": 176.0,
+      "pb_cash_msek": 402.96104245619875,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -1.8778955563902855e-06,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 1.0118128557223827e-10,
+      "change_from_baseline_pct": {
+        "load_mwh": 0.0,
+        "wind_mwh": 0.0,
+        "import_mwh": 0.0,
+        "losses_mwh": 0.0,
+        "peak_mw": 0.0,
+        "pb_cash_msek": -0.10029157170133862
+      }
+    },
+    {
+      "name": "price_high",
+      "days": 3,
+      "load_mwh": 9681.48,
+      "served_mwh": 9681.48,
+      "unserved_mwh": 0,
+      "wind_mwh": 5383.91,
+      "import_mwh": 4801.45,
+      "export_mwh": 90.22,
+      "losses_mwh": 413.655779,
+      "peak_mw": 176.0,
+      "pb_cash_msek": 403.770125824276,
+      "residents": 55300,
+      "numerical_failures": 0,
+      "money_residual": -1.6433186829090118e-06,
+      "max_goods_residual": 4.3655745685100555e-10,
+      "max_water_residual": 1.0118128557223827e-10,
+      "change_from_baseline_pct": {
+        "load_mwh": 0.0,
+        "wind_mwh": 0.0,
+        "import_mwh": 0.0,
+        "losses_mwh": 0.0,
+        "peak_mw": 0.0,
+        "pb_cash_msek": 0.10029157170237113
+      }
+    }
+  ],
+  "private_credit_30_day_stress": [
+    {
+      "apr": 0.04,
+      "ending_debt_sek": 441304.1031474634,
+      "interest_sek": 2131.164005059149,
+      "repaid_sek": 1558695.8968525366,
+      "status": "operating"
+    },
+    {
+      "apr": 0.08,
+      "ending_debt_sek": 443290.8149532416,
+      "interest_sek": 4269.561280767731,
+      "repaid_sek": 1556709.185046758,
+      "status": "operating"
+    },
+    {
+      "apr": 0.12,
+      "ending_debt_sek": 445215.5735662564,
+      "interest_sek": 6415.202341007956,
+      "repaid_sek": 1554784.4264337432,
+      "status": "operating"
+    }
+  ],
+  "construction_example": {
+    "example": "20 MW / 80 MWh grid-forming battery at V\u00e4sterhamn",
+    "baseline_cost_sek": 326600000,
+    "baseline_days": 240,
+    "cost_range_sek": [
+      261280000.0,
+      391920000.0
+    ],
+    "duration_range_days": [
+      192.0,
+      288.0
+    ],
+    "varied_inputs": "All storage MW/MWh capex terms or construction duration together by \u00b120%",
+    "declared_cost_assumptions": {
+      "storage_mw": 4.6,
+      "storage_mwh": 2.4,
+      "grid_forming_extra": 0.15
+    },
+    "declared_duration_days": 240
+  }
+}
