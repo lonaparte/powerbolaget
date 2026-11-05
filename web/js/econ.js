@@ -61,9 +61,16 @@ PB.econ = (() => {
     const top = d.totals.slice(0, 40);
     return `<div class="kpis"><div class="kpi"><small>Powerbolaget cash</small><b>${PB.msek(d.pb_cash / 1e6)}</b></div><div class="kpi"><small>External financing</small><b>${PB.msek(d.financing / 1e6)}</b></div>
       <div class="kpi"><small>Region (public sector)</small><b>${PB.msek(d.region / 1e6)}</b></div></div>
+      <h3>RETAIL CONTRACT OFFERS · SEK/KWH</h3>
+      <p class="small muted">Signed contracts keep their terms until expiry. Customers choose a new fixed or indexed offer at renewal. Monthly index uses the last complete calendar month.</p>
+      ${Object.entries(d.retail_policy || {}).map(([group, p]) => `<form data-retail="${group}" class="card"><b>${PB.esc(group)}</b>
+        ${[['network_fee','Network fee'],['fixed_markup','Fixed markup'],['floating_markup','Indexed markup'],['fixed_days','Fixed days'],['floating_days','Indexed days']].map(([k,label]) => `<label>${label} <input name="${k}" type="number" step="${k.endsWith('days') ? '1' : '.01'}" min="${k.endsWith('days') ? 1 : k==='network_fee' ? 0 : -.5}" max="${k.endsWith('days') ? 1095 : 5}" value="${p[k]}" required></label>`).join('')}
+        <label>Index <select name="floating_index"><option value="spot" ${p.floating_index==='spot'?'selected':''}>Hourly mainland</option><option value="monthly" ${p.floating_index==='monthly'?'selected':''}>Previous month</option></select></label>
+        <button type="submit">Update new offers</button></form>`).join('')}
+      <h3>PRIVATE COMPANY CREDIT · SEK</h3>${table(['id','company','status','limit','debt','interest paid','repaid','bank losses'], (d.loans || []).map(x => [x.id,x.name,x.status,x.limit,x.debt,x.interest,x.repaid,x.losses]), 0, {hide:[0]})}
       <h3>MONEY MOVED SINCE FE 1, BY CATEGORY</h3>${table(['category', 'SEK'], top.map(([k, v]) => [k, v]), 0)}
       <h3>LATEST LARGE PAYMENTS</h3>${table(['time', 'payer', 'payee', 'SEK', 'category', 'good', 'qty'], d.journal.slice().reverse().map(j => [j[0], j[1], j[2], j[3], j[4], j[5] || '', j[6] ?? '']), 0)}
-      <p class="small muted">Double-entry ledger: every payment has a payer and a payee, so money is never created or lost. Free investment: shortfalls are booked as external financing.</p>`;
+      <p class="small muted">Every payment has a payer and payee. Powerbolaget investment shortfalls use explicit external financing. Private firms have finite credit; interest, repayment and liquidation losses are recorded separately.</p>`;
   }
   function demography(d) {
     const rows = d.months.map(m => [`month ${m.month + 1}`, m.start, m.births, m.deaths, m.immigration, m.emigration, m.internal_moves, m.end, m.tourist_arrivals, m.tourists_turned_away]);
@@ -75,6 +82,12 @@ PB.econ = (() => {
     if (t.dataset.tab) { tab = t.dataset.tab; filter = ''; render(); load(); return; }
     if (t.dataset.sort != null) { const i = Number(t.dataset.sort), s = sort[tab] || {col: -1, dir: 1}; sort[tab] = {col: i, dir: s.col === i ? -s.dir : -1}; render(); return; }
     if (t.dataset.goto) { const id = t.dataset.goto; if (['zones', 'firms', 'pops'].includes(tab)) PB.select(id); }
+  });
+  el.addEventListener('submit', async ev => {
+    const form = ev.target.closest('form[data-retail]'); if (!form) return;
+    ev.preventDefault();
+    const policy = Object.fromEntries([...new FormData(form)].map(([k,v]) => [k,k==='floating_index'?v:Number(v)]));
+    if (await PB.command({kind:'retail_policy',category:form.dataset.retail,policy})) load();
   });
   setInterval(() => { if (!el.hidden && !document.hidden) load(); }, 6000);
   return {show() { load(); }, render};

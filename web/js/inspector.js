@@ -86,7 +86,9 @@ PB.inspector = (() => {
         d.output ? ['Sells', `${PB.esc(d.output)} at ${PB.fmt(d.price, 0)} SEK`] : null, ['Utilisation (EMA)', PB.pct(d.util)], ['Margin (EMA)', PB.pct(d.margin)],
         ['Electricity now', PB.mw(d.power)], d.beds ? ['Beds', PB.int(d.beds)] : null, d.herd ? ['Herd (cow equivalents)', PB.int(d.herd)] : null,
         ['Yesterday: produced / sold', `${PB.fmt(d.yesterday.produced, 1)} / ${PB.fmt(d.yesterday.sold, 1)}`], ['Yesterday: revenue', PB.int(d.yesterday.revenue) + ' SEK'],
-        ['Yesterday: power cost', PB.int(d.yesterday.power_cost) + ' SEK'], ['Yesterday: outage', PB.int(d.yesterday.outage_min) + ' min']])
+        ['Yesterday: power cost', PB.int(d.yesterday.power_cost) + ' SEK'], ['Yesterday: outage', PB.int(d.yesterday.outage_min) + ' min'],
+        ['Electricity contract', d.contract ? `${d.contract.mode} · ${PB.fmt(d.electricity_price,3)} SEK/kWh` : '—'],
+        ['Debt / credit limit', d.credit ? `${PB.msek(d.credit.debt/1e6)} / ${PB.msek(d.credit.limit/1e6)}` : '—']])
         + (Object.keys(d.inventory).length ? `<h3>STOCK</h3>${kv(Object.entries(d.inventory).map(([k, v]) => [k, PB.fmt(v, 0)]))}` : '')
         + (d.equipment.length ? `<h3>EQUIPMENT</h3><ul class="list">${d.equipment.map(e => `<li>${PB.esc(e.name)} ${statusChip(e.state)}<span class="small muted" style="margin-left:auto">${PB.fmt(e.p, 2)}/${PB.fmt(e.rated, 2)} MW${e.trips ? ` · ${e.trips} trips` : ''}</span></li>`).join('')}</ul>` : '')
         + `<p class="small muted">A firm decides for itself: it plans production from its own forecast, prices, stock and staff. Powerbolaget can only influence it through supply and price.</p>`

@@ -24,6 +24,8 @@ from . import grid as G
 from . import loads as L
 from . import society as S
 from . import weather as W
+from . import retail as R
+from . import finance as F
 from .calendar import DAY, HOUR, is_rest_day, label, month_index, parts, stamp
 from .events import EventQueue
 from .ledger import Ledger
@@ -70,6 +72,8 @@ class World:
         self.projects = {}
         self.counters = {}
         self.settings = dict(link_margin=.03, storage_reserve=.35)
+        self.retail_policy, self.retail_version, self.contracts = R.default_policy(), 1, {}
+        self.price_observations = dict(sum=0., hours=0)
         self.demography = dict(month=self._blank_demo(), months=[])
         self.history_hour = deque(maxlen=HISTORY_HOURS)
         self.history_day = []
@@ -103,6 +107,10 @@ class World:
                     'last_losses', 'construction_backlog', 'outage_today'):
             setattr(self, key, s[key])
         self.history_hour = deque(s['history_hour'], maxlen=HISTORY_HOURS)
+        self.retail_policy = s.get('retail_policy', R.default_policy())
+        self.retail_version = s.get('retail_version', 1)
+        self.contracts = s.get('contracts', {})
+        self.price_observations = s.get('price_observations', dict(sum=0., hours=0))
         self.logbook = deque(s['logbook'], maxlen=400)
         self.outage = {k: deque(v, maxlen=120) for k, v in s['outage'].items()}
         self.zone_by_id = {z['id']: z for z in self.zones}
@@ -120,7 +128,8 @@ class World:
                     outage={k: list(v) for k, v in self.outage.items()}, commands=self.commands, acc=self.acc,
                     price_avg=self.price_avg, contract_price=self.contract_price, last_losses=self.last_losses,
                     construction_backlog=self.construction_backlog, outage_today=self.outage_today,
-                    command_receipts=self.command_receipts)
+                    command_receipts=self.command_receipts, retail_policy=self.retail_policy,
+                    retail_version=self.retail_version, contracts=self.contracts, price_observations=self.price_observations)
 
     @staticmethod
     def _blank_demo():
@@ -164,10 +173,8 @@ class World:
         from math import exp
         return max(.05, PRICE_BASE*seasonal*shape*exp(weather))
 
-    def tariff(self, cls, t):
-        if cls == 'industry':
-            return self.contract_price*(1-INDUSTRY_CONTRACT_DISCOUNT)+NETWORK_FEE['industry']
-        return self.price_avg+RETAIL_MARGIN+NETWORK_FEE[cls]
+    def tariff(self, cls, t, owner=None):
+        return R.price(self, cls, t, owner)
 
     def forecast(self, issued, t):
         return W.forecast(self.seed, issued/1440, t/1440)
@@ -252,6 +259,8 @@ class World:
                 thermal, elec = L.heating_demand(d, t, w)
                 d['heat_thermal_kw'], d['heat_electric_kw'] = thermal, elec
             p = max(0., L.request(d, t, w, ctx))
+            if d['owner'][0] == 'firm' and self.firms[d['owner'][1]]['status'] not in ('operating', 'construction'):
+                p = 0.
             out[did] = (p, L.q_from_p(p, d['pf']))
         return out
 
@@ -749,21 +758,25 @@ class World:
         for d in self.devices.values():
             e = d['e_srv']
             if e > 0:
+                billed = 0.
                 if d['owner'][0] == 'zone':
                     price = self.tariff('household', start)*1000
                     people = zone_persons.get(d['owner'][1], [])
                     total = sum(p['count'] for p in people) or 1
                     for p in people:
                         if p['count']:
+                            price = self.tariff('household', start, 'pop:'+p['id'])*1000
                             led.transfer('pop:'+p['id'], 'pb', e*price*p['count']/total, 'electricity', start)
+                            billed += e*price*p['count']/total
                 else:
                     f = self.firms[d['owner'][1]]
                     cls = 'industry' if f['kind'] in ('cement', 'quarry', 'dairy', 'feedmill', 'slaughter', 'brewery') else 'business'
-                    price = self.tariff(cls, start)*1000
+                    price = self.tariff(cls, start, 'firm:'+f['id'])*1000
                     payer = 'region' if f['kind'] in ('public', 'hospital') else 'firm:'+f['id']
                     led.transfer(payer, 'pb', e*price, 'electricity', start)
                     f['today']['power_cost'] += e*price
-                sales += e*price
+                    billed = e*price
+                sales += billed
             self.entity_point(d['id'], round(d['e_srv'], 4), round(d['e_req']-d['e_srv'], 4))
             d['e_req'] = d['e_srv'] = 0.
         led.transfer('pb', 'external', acc['import_cost'], 'power import', start)
@@ -774,7 +787,8 @@ class World:
             self.outage.setdefault(z['id'], deque(maxlen=120))
             self.outage_today[z['id']] = self.outage_today.get(z['id'], 0.)+hours
         price = self.energy_price(start)
-        self.price_avg += (price-self.price_avg)/720
+        self.price_observations['sum'] += price
+        self.price_observations['hours'] += 1
         st = self.society_stats
         tb = self.grid['turbines']
         for tid, t in tb.items():
@@ -848,10 +862,7 @@ class World:
         if led.balance('pb') < 0:
             led.transfer('financing', 'pb', -led.balance('pb')+20e6, 'external financing', m)
             self.log('finance', 'Cash shortfall covered by external financing (free-investment rule)', None)
-        for f in self.firms.values():
-            bal = led.balance('firm:'+f['id'])
-            if bal < 0 and f['kind'] not in ('public', 'hospital'):
-                led.transfer('financing', 'firm:'+f['id'], -bal+1e6, 'bank credit', m)
+        F.close_day(self, m)
         E.close_day(self, m)
         for z in self.zones:
             self.outage.setdefault(z['id'], deque(maxlen=120)).append(round(self.outage_today.get(z['id'], 0.), 3))
@@ -868,6 +879,7 @@ class World:
             money={k: round(v) for k, v in day.items() if abs(v) >= 1}))
 
     def settle_month(self, m):
+        R.close_month(self)
         C.pay_progress(self, m)
         for p in self.projects.values():
             if p['status'] == 'building' and p['kind'] == 'expansion':
@@ -986,6 +998,13 @@ def command(world, cmd):
         world.settings['link_margin'] = margin
         result = f'Link operating margin set to {margin*100:.0f} %'
         world.log('operation', result, None)
+    elif kind == 'retail_policy':
+        try:
+            R.change_policy(world, cmd['category'], cmd['policy'])
+        except (ValueError, KeyError, TypeError) as exc:
+            raise CommandError(str(exc))
+        result = f"New {cmd['category']} contract offers updated; signed contracts keep their terms"
+        world.log('finance', result, None)
     else:
         raise CommandError('Unknown command.')
     world.commands.append(dict(minute=world.minute, **cmd))

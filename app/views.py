@@ -286,6 +286,7 @@ def zone_view(world, zid):
 
 
 def firm_view(world, fid):
+    from . import retail as R
     x = world.firms[fid]
     led = world.ledger
     eq = []
@@ -295,6 +296,8 @@ def firm_view(world, fid):
                        priority=d['priority'], trips=d.get('trips', 0)))
     return dict(type='firm', id=fid, title=x['name'], kind=x['kind'], sector=x['sector'], zone=x['zone'], bus=x['bus'],
                 status=x['status'], staff=x['staff'], desired_staff=x['desired_staff'], cash=r(led.balance('firm:'+fid)),
+                contract=world.contracts.get('firm:'+fid), credit=x.get('credit'), liquidation=x.get('liquidation'),
+                electricity_price=world.tariff(R.category(x), world.minute, 'firm:'+fid),
                 price=r(x['price'], 1), output=x['output'], inventory={k: r(v, 1) for k, v in x['inventory'].items()},
                 today={k: r(v, 1) for k, v in x['today'].items()}, yesterday={k: r(v, 1) for k, v in x['last_day'].items()},
                 util=r(x['ema_util'], 3), margin=r(x['ema_margin'], 3), capacity_factor=r(x['capacity_factor'], 3),
@@ -353,6 +356,9 @@ def table(world, name):
     if name == 'finance':
         cats = sorted(led.totals.items(), key=lambda kv: -kv[1])
         return dict(pb_cash=r(led.balance('pb')), financing=r(-led.balance('financing')), region=r(led.balance('region')),
+                    retail_policy=world.retail_policy, retail_version=world.retail_version,
+                    loans=[dict(id=f['id'], name=f['name'], status=f['status'], **f['credit'])
+                           for f in world.firms.values() if 'credit' in f],
                     totals=[[k, r(v, 0)] for k, v in cats], days=world.history_day[-60:],
                     journal=list(world.ledger.journal)[-60:])
     if name == 'demography':

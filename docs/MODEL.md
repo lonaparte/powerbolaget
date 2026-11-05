@@ -209,3 +209,18 @@ Three views (island, grid, economy), map layers, a context inspector, parcel det
 ## 12. Open questions carried forward
 
 Calibrated economic coefficients, tariff pass-through, the turbine dynamic model, HVAC and HVDC control choices, construction costs and durations, and load calibration against public annual statistics are all open. UI usability with students is still to be tested.
+# Confirmed retail and private finance rules
+
+Electricity billing and industrial scheduling use the same signed contract. Fixed prices are fixed
+until expiry. Indexed contracts use their signed hourly or previous-calendar-month reference plus
+markup and network fee. The financial view edits offers for future contracts; it cannot rewrite
+existing contracts. Customers compare known mean costs plus a 0.02/0.04 SEK/kWh risk premium at renewal.
+
+Private companies have a finite facility (two months of payroll plus 25% inventory collateral,
+minimum 0.25 MSEK), 8% annual interest and surplus-cash repayment. Thirty consecutive distressed days
+or an unpaid overdraft triggers exit. Weekly distress reduces employment. Liquidation explicitly
+records inventory exports, bank recovery/loss, equity and layoffs. These are transparent design
+assumptions, not calibrated Swedish banking statistics. Public budgets and PB's free-investment
+financing retain separate accounts. Industrial throughput is limited by staffing, installed capacity,
+inputs and output storage; full storage does not consume inputs or discard production.
+

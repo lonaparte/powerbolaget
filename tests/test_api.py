@@ -29,6 +29,11 @@ def test_a_new_game_runs_and_takes_commands(client):
     for name in ('zones', 'pops', 'firms', 'markets', 'finance', 'demography', 'history', 'outlook'):
         assert client.post('/api/table', json={'session': sid, 'name': name}, headers=H).status_code == 200
     save = client.post('/api/save', json={'session': sid}, headers=H).json()
+    r = client.post('/api/command', json={'session': sid, 'command': {'kind':'retail_policy',
+                    'category':'business','policy':{'network_fee':.35}}}, headers=H)
+    assert r.status_code == 200
+    finance = client.post('/api/table', json={'session': sid, 'name':'finance'}, headers=H).json()
+    assert finance['retail_policy']['business']['network_fee'] == .35
     loaded = client.post('/api/session/load', json={'save': save}, headers=H).json()
     assert loaded['snapshot']['minute'] == 45
 

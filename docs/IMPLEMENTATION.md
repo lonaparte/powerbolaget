@@ -25,7 +25,7 @@ Each batch is checked and committed separately on `codex/development` and pushed
 Completion means executable behavior and validation, not just documentation or a UI placeholder.
 
 - [ ] Production labor/capacity, inventory conservation, elapsed-time protection and request deduplication.
-- [ ] Contract-consistent planning, retail policy and bounded private finance/exit.
+- [x] Contract-consistent planning, retail policy and bounded private finance/exit.
 - [ ] Editable engineering, oil backup, player-controlled links and asset lifecycle.
 - [ ] Aggregated electrical dynamics, P/Q limits and fault/protection/restoration behavior.
 - [ ] Versioned module exchanges, persistent layered history and engineering exports.
@@ -46,3 +46,7 @@ without a public source are assumptions and must be visible as such in the model
 - Batch 1: labor/capacity-limited industrial throughput, storage-limited recipe production with
   material counters, elapsed-time overload protection, persisted command receipts/client request IDs,
   and favicon. Validation: 30 Python tests and all 4 Chromium game workflows passed.
+- Batch 2: immutable signed retail contracts, autonomous renewal, actual-contract load planning,
+  calendar-month price index, editable offer UI/API, bounded collateral/payroll credit, interest,
+  repayment, credit-constrained input purchases and liquidation/job settlement. Validation: 34 Python
+  tests passed; after UI integration the 10 affected Python tests and all 4 browser workflows passed.

@@ -12,6 +12,7 @@ from math import exp, hypot, tanh
 from . import loads as L
 from .calendar import HOUR, is_rest_day, parts
 from .params import GOODS, IMPORT_SHARE, INCOME_TAX, SHIFT_HOURS, WAGE
+from . import retail as R
 
 # Industrial firms: id, name, kind, zone, connection bus, staff.
 INDUSTRY = [
@@ -165,12 +166,13 @@ def plan_hour(world, now):
     """Every firm decides the coming hour from what it knows at `now`."""
     p = parts(now)
     hour, rest = p['hour'], is_rest_day(now)
-    price = world.energy_price(now)
-    avg = world.price_avg
     for f in world.firms.values():
         if f['status'] != 'operating':
             continue
         kind = f['kind']
+        cls, owner = R.category(f), 'firm:'+f['id']
+        price = world.tariff(cls, now, owner)
+        avg = R.expected_price(world, cls, now, owner)
         want = {}
         if kind == 'cement':
             inv, lim = f['inventory'], f['limits']
@@ -357,7 +359,12 @@ def daily_farm(world, f, minute):
 def sell_island(world, good, orders, minute):
     """Clear an island market. orders: list of (buyer account, qty).
     Local sellers first (cheapest first), then imports at import parity. Returns filled quantities."""
+    from .finance import liquidity
     m = world.markets[good]
+    # Discretionary input buying cannot create an overdraft beyond the signed credit facility.
+    orders = [(buyer, min(qty, liquidity(world, world.firms[buyer[5:]])/
+                         max(m['price'], import_price(world, good), 1e-9)))
+              if buyer.startswith('firm:') else (buyer, qty) for buyer, qty in orders]
     sellers = [f for f in world.firms.values() if f['status'] == 'operating' and f['scope'] == 'island'
                and f['inventory'].get(good, 0.) > 1e-9 and good in sells(f)]
     supply = {f['id']: max(0., f['inventory'][good]-reserve(f, good)) for f in sellers}
@@ -562,7 +569,7 @@ def close_day(world, minute):
 def capacity_per_day(f):
     rates = {'cement': (CEMENT_RATE['cmill1']+CEMENT_RATE['cmill2'])*24, 'quarry': QUARRY_RATE.get(f['id'], 180.)*14, 'dairy': 16/6.2*16,
              'feedmill': 12*9, 'slaughter': 2.2/1.65*9, 'brewery': .9*9}
-    return rates.get(f['kind'], 1.)
+    return rates.get(f['kind'], 1.)*f.get('capacity_factor', 1.)
 
 
 # ---------------------------------------------------------------- labour market

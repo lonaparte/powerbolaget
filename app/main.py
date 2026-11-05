@@ -111,10 +111,22 @@ class Build(BaseModel):
     line_type: Literal['OHL110', 'CAB110'] = 'OHL110'
 
 
+class RetailPolicy(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    network_fee: Optional[float] = Field(default=None, ge=0, le=5)
+    fixed_markup: Optional[float] = Field(default=None, ge=-.5, le=5)
+    floating_markup: Optional[float] = Field(default=None, ge=-.5, le=5)
+    fixed_days: Optional[int] = Field(default=None, ge=1, le=1095)
+    floating_days: Optional[int] = Field(default=None, ge=1, le=1095)
+    floating_index: Optional[Literal['spot', 'monthly']] = None
+
+
 class Command(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_id: Optional[str] = Field(default=None, min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
-    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings']
+    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings', 'retail_policy']
+    category: Optional[Literal['household', 'industry', 'business']] = None
+    policy: Optional[RetailPolicy] = None
     build: Optional[Build] = None
     target: Optional[str] = Field(default=None, pattern=ID)
     closed: Optional[bool] = None
