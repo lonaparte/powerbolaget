@@ -57,7 +57,7 @@ def worker(conn):
 
     ops = dict(
         tick=tick, command=cmd, preview=preview, save=lambda w, a: w.state(),
-        entity=lambda w, a: views.entity(w, a['id']), table=lambda w, a: views.table(w, a['name']),
+        entity=lambda w, a: views.entity(w, a['id']), table=lambda w, a: views.table(w, **a),
         parcel=lambda w, a: views.parcel(w, a['x'], a['y']),
         history=lambda w,a: history.export(w,**a), exchanges=lambda w,a:w.messages)
     ops['work_preview']=lambda w,a:engineering.plan_asset(w,a['target'],a['action'])

@@ -33,6 +33,10 @@ def test_a_new_game_runs_and_takes_commands(client):
         assert client.post('/api/entity', json={'session': sid, 'id': eid}, headers=H).status_code == 200
     for name in ('zones', 'pops', 'firms', 'markets', 'finance', 'demography', 'history', 'outlook'):
         assert client.post('/api/table', json={'session': sid, 'name': name}, headers=H).status_code == 200
+    page=client.post('/api/table',json={'session':sid,'name':'pops','offset':0,'limit':7,'query':'resident','sort':5,'direction':-1},headers=H).json()
+    assert page['paged'] and len(page['rows'])==7 and page['filtered']>7
+    assert all('resident' in ' '.join(map(str,row)).lower() for row in page['rows'])
+    assert [row[5] for row in page['rows']]==sorted((row[5] for row in page['rows']),reverse=True)
     save = client.post('/api/save', json={'session': sid}, headers=H).json()
     r = client.post('/api/command', json={'session': sid, 'command': {'kind':'retail_policy',
                     'category':'business','policy':{'network_fee':.35}}}, headers=H)

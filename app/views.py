@@ -333,7 +333,7 @@ def firm_view(world, fid):
 
 
 # ---------------------------------------------------------------- statistics pages
-def table(world, name):
+def table(world, name, offset=0, limit=None, query='', sort=-1, direction=1):
     st = world.society_stats
     led = world.ledger
     if name == 'zones':
@@ -353,8 +353,15 @@ def table(world, name):
         rows = [[p['id'], pop_title(world, p), p['kind'], p['zone'], p['group'] or '', p['count'], p['employed'], p.get('inactive', 0),
                  r(led.balance('pop:'+p['id'])/max(1, p['count']), 0), r(p['income_ema']/max(1, p['count']), 0)]
                 for p in world.pops.values() if p['count'] > 0]
+        if query:
+            needle=query.casefold();rows=[row for row in rows if needle in ' '.join(map(str,row)).casefold()]
+        if 0<=sort<len(rows[0] if rows else ()):
+            rows.sort(key=lambda row:(row[sort] is None,row[sort] if isinstance(row[sort],(int,float)) else str(row[sort]).casefold()),
+                      reverse=direction<0)
+        filtered=len(rows)
+        if limit is not None:rows=rows[offset:offset+limit]
         return dict(columns=['id', 'POP', 'kind', 'zone', 'group', 'people', 'employed', 'inactive', 'wealth/person', 'income/person/day'],
-                    rows=rows, total=len(world.pops))
+                    rows=rows, total=len(world.pops),filtered=filtered,offset=offset,limit=limit,paged=limit is not None)
     if name == 'firms':
         rows = []
         for x in world.firms.values():

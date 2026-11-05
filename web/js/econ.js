@@ -4,13 +4,14 @@
 PB.econ = (() => {
   const el = PB.$('econ');
   const TABS = [['overview', 'OVERVIEW'], ['zones', 'REGIONS'], ['pops', 'POPS'], ['firms', 'FIRMS'], ['markets', 'MARKETS'], ['finance', 'FINANCE'], ['demography', 'DEMOGRAPHY']];
-  let tab = 'overview', data = {}, sort = {}, filter = '',page=0;
+  let tab = 'overview', data = {}, sort = {}, filter = '',page=0,filterTimer=null;
   function table(cols, rows, clickCol = 0, opts = {}) {
     const s = sort[tab] || {col: -1, dir: 1};
-    let body = rows.filter(r => !filter || r.join(' ').toLowerCase().includes(filter.toLowerCase()));
-    if (s.col >= 0) body = [...body].sort((a, b) => (typeof a[s.col] === 'number' && typeof b[s.col] === 'number' ? a[s.col] - b[s.col] : String(a[s.col]).localeCompare(String(b[s.col]))) * s.dir);
-    const pages=Math.max(1,Math.ceil(body.length/100));page=PB.clamp(page,0,pages-1);const count=body.length;
-    body=body.slice(page*100,(page+1)*100);
+    let body = rows,count,pages;
+    if(opts.paged){count=opts.total;pages=Math.max(1,Math.ceil(count/100));page=PB.clamp(page,0,pages-1);}
+    else{body=rows.filter(r => !filter || r.join(' ').toLowerCase().includes(filter.toLowerCase()));
+      if (s.col >= 0) body = [...body].sort((a, b) => (typeof a[s.col] === 'number' && typeof b[s.col] === 'number' ? a[s.col] - b[s.col] : String(a[s.col]).localeCompare(String(b[s.col]))) * s.dir);
+      pages=Math.max(1,Math.ceil(body.length/100));page=PB.clamp(page,0,pages-1);count=body.length;body=body.slice(page*100,(page+1)*100);}
     const fmt = v => typeof v === 'number' ? (Math.abs(v) < 1 && v !== 0 ? PB.fmt(v, 3) : Number.isInteger(v) ? PB.int(v) : PB.fmt(v, 1)) : PB.esc(v ?? '—');
     const hide = opts.hide || [];
     return `<div class="table-wrap"><table><thead><tr>${cols.map((c, i) => hide.includes(i) ? '' : `<th data-sort="${i}" class="${i <= 1 ? 'l' : ''}">${PB.esc(c)}${s.col === i ? (s.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
@@ -18,7 +19,8 @@ PB.econ = (() => {
   }
   async function load() {
     const name = tab === 'overview' ? 'history' : tab;
-    try { data[tab] = await PB.call('/table', {name}); } catch (e) { data[tab] = {error: e.message}; }
+    const s=sort[tab]||{col:-1,dir:1},paging=tab==='pops'?{offset:page*100,limit:100,query:filter,sort:s.col,direction:s.dir}:{};
+    try { data[tab] = await PB.call('/table', {name,...paging}); } catch (e) { data[tab] = {error: e.message}; }
     render();
   }
   function render() {
@@ -29,14 +31,14 @@ PB.econ = (() => {
     else if (d.error) html += `<p class="bad">${PB.esc(d.error)}</p>`;
     else if (tab === 'overview') html += overview(d);
     else if (tab === 'zones' || tab === 'firms') html += table(d.columns, d.rows, 0, {hide: [0]});
-    else if (tab === 'pops') html += `<p class="small muted">${PB.int(d.total)} POP objects (cap 10,000). Each is a group with a count.</p>` + table(d.columns, d.rows, 0, {hide: [0]});
+    else if (tab === 'pops') html += `<p class="small muted">${PB.int(d.total)} POP objects (cap 10,000). ${PB.int(d.filtered)} have people${filter?' and match the filter':''}. Each is a group with a count.</p>` + table(d.columns, d.rows, 0, {hide: [0],paged:true,total:d.filtered});
     else if (tab === 'markets') html += `<h3>ISLAND MARKETS (YESTERDAY)</h3>` + table(d.columns, d.rows, 0) + `<h3>LOCAL SERVICES, LODGING AND FERRY</h3>` + table(d.services_columns, d.services, 0, {hide: [0]})
       + `<p class="small muted">Island prices move between mainland export and import parity. Electricity is not traded here: it is billed from metered supply at Powerbolaget's tariffs.</p>`;
     else if (tab === 'finance') html += finance(d);
     else if (tab === 'demography') html += demography(d);
     el.innerHTML = html;
     el.querySelectorAll('canvas[data-series]').forEach(c => drawSeries(c));
-    const f = PB.$('efilter'); if (f) { f.oninput = () => { filter = f.value;page=0; const pos = f.selectionStart; render(); const g = PB.$('efilter'); g.focus(); g.setSelectionRange(pos, pos); }; }
+    const f = PB.$('efilter'); if (f) { f.oninput = () => { filter = f.value;page=0; const pos = f.selectionStart; render(); const g = PB.$('efilter'); g.focus(); g.setSelectionRange(pos, pos);if(tab==='pops'){clearTimeout(filterTimer);filterTimer=setTimeout(load,150);} }; }
   }
   let hist = null;
   function overview(d) {
@@ -87,9 +89,9 @@ PB.econ = (() => {
   }
   el.addEventListener('click', ev => {
     const t = ev.target.closest('[data-tab],[data-sort],[data-page],tr[data-goto]'); if (!t) return;
-    if(t.dataset.page!=null){page=Number(t.dataset.page);render();return;}
+    if(t.dataset.page!=null){page=Number(t.dataset.page);if(tab==='pops')load();else render();return;}
     if (t.dataset.tab) { tab = t.dataset.tab; filter = '';page=0; render(); load(); return; }
-    if (t.dataset.sort != null) { const i = Number(t.dataset.sort), s = sort[tab] || {col: -1, dir: 1}; sort[tab] = {col: i, dir: s.col === i ? -s.dir : -1};page=0; render(); return; }
+    if (t.dataset.sort != null) { const i = Number(t.dataset.sort), s = sort[tab] || {col: -1, dir: 1}; sort[tab] = {col: i, dir: s.col === i ? -s.dir : -1};page=0;if(tab==='pops')load();else render(); return; }
     if (t.dataset.goto) { const id = t.dataset.goto; if (['zones', 'firms', 'pops'].includes(tab)) PB.select(id); }
   });
   el.addEventListener('submit', async ev => {

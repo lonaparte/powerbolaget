@@ -167,6 +167,11 @@ class ParcelRequest(Ref):
 
 class TableRequest(Ref):
     name: Literal['zones', 'pops', 'firms', 'markets', 'finance', 'demography', 'history', 'outlook']
+    offset: int = Field(default=0,ge=0,le=10_000)
+    limit: Optional[int] = Field(default=None,ge=1,le=500)
+    query: str = Field(default='',max_length=80)
+    sort: int = Field(default=-1,ge=-1,le=20)
+    direction: Literal[-1,1] = 1
 
 
 class HistoryRequest(Ref):
@@ -289,7 +294,7 @@ def parcel(payload: ParcelRequest):
 
 @app.post('/api/table')
 def table(payload: TableRequest):
-    return call(payload.session, 'table', dict(name=payload.name))
+    return call(payload.session, 'table', payload.model_dump(exclude={'session'}))
 
 
 @app.exception_handler(RuntimeError)

@@ -7,6 +7,7 @@ import cProfile
 import copy
 import heapq
 import json
+import platform
 import resource
 import subprocess
 import sys
@@ -190,7 +191,9 @@ def main():
         p.error('--output is required unless --case is used')
     cases=[('small',190,54,120,None),('medium',2000,180,120,None),('large',6000,360,120,None),
            ('full',10000,600,120,a.full_save)]
-    data=dict(method='Timed single-world intervals + separate profile interval + two worker processes',
+    processor=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name')),platform.machine())
+    data=dict(git_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),python=platform.python_version(),processor=processor,
+        method='Timed single-world intervals + separate profile interval + two worker processes',
         cases=[isolated_case(x) for x in cases],concurrency=concurrency())
     a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(data,indent=2),encoding='utf-8')
 

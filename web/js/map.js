@@ -541,6 +541,7 @@ PB.map = (() => {
   PB.on('snapshot', () => { if (frame % 4 === 0) placeLabels(); });
   return {
     performance(){const sorted=renderTimes.slice().sort((a,b)=>a-b),mean=a=>a.reduce((s,x)=>s+x,0)/Math.max(1,a.length);return {samples:sorted.length,render_mean_ms:mean(renderTimes),render_p95_ms:sorted[Math.floor(.95*sorted.length)]||0,fps:1000/mean(frameTimes),scope:'last 600 animation frames'};},
+    resetPerformance(){renderTimes.length=0;frameTimes.length=0;lastFrame=0;},
     setMode(m) { mode = m; terrainKey = ''; placeLabels(); PB.map.renderLayers(); },
     get mode() { return mode; },
     layers, focus(id) { const p = positionOf(id); if (p) { view.cx = p[0]; view.cy = p[1]; view.z = Math.max(view.z, 6); terrainKey = ''; placeLabels(); } },

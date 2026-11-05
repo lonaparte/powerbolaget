@@ -93,5 +93,7 @@ without a public source are assumptions and must be visible as such in the model
   stable island load restoration; ageing for split POP cohorts; checksummed, size-limited compressed
   history in saves; resumable benchmarks and synthetic 10,000-POP/600-turbine scale fixtures.
   Validation: all 68 Python checks and all 5 Chromium workflows passed. A filled-retention scale
-  fixture reduced a 32.35 MB raw save to 9.10 MB, below the 12 MB request limit. Final scale timing,
-  annual trace, sensitivity and browser rendering measurements remain in the acceptance batch.
+  fixture reduced a 32.67 MB raw save to 9.22 MB, below the 12 MB request limit. The controlled
+  10,000-POP/600-turbine case supplied all demand with no numerical failures at 2.48 s CPU/simulated
+  hour and 97.3 MiB peak RSS. Server-paged POP tables render 100 rows at a time; the full grid view
+  measured 6.74 ms mean / 8.5 ms p95 at 60 FPS in headless Chromium. Annual acceptance remains active.
