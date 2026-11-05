@@ -40,6 +40,8 @@ def plan_turbine(world, model, x, y, connect_bus=None, route=None):
     if land.homes_within(x, y, HOME_DISTANCE):
         raise BuildError(f'Closer than {HOME_DISTANCE*1000:.0f} m to homes.')
     for t in world.grid['turbines'].values():
+        if t['status']=='retired':
+            continue
         spacing = 3.5*max(m['rotor'], t['rotor'])/1000
         if hypot(t['x']-x, t['y']-y) < spacing:
             raise BuildError(f"Closer than {spacing:.2f} km to turbine {t['id'].upper()}.")

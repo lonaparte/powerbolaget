@@ -12,6 +12,7 @@ class Ledger:
     def __init__(self, state=None):
         state = state or {}
         self.accounts = defaultdict(float, state.get('accounts', {}))
+        self.quantities=defaultdict(float,state.get('quantities',{}))
         self.totals = defaultdict(float, state.get('totals', {}))     # cumulative SEK by category
         self.today = defaultdict(float, state.get('today', {}))       # current day, by category
         self.journal = deque(state.get('journal', []), maxlen=300)    # latest entries, for inspection
@@ -20,6 +21,13 @@ class Ledger:
         self.transfer('genesis', account, amount, 'opening balance')
 
     def transfer(self, payer, payee, amount, category, t=None, good=None, qty=None):
+        if good and qty and qty>0:
+            if category.startswith('import:') and payer.startswith('firm:'):
+                self.quantities[good]+=qty
+            elif category.startswith('export:') or category=='liquidation inventory':
+                self.quantities[good]-=qty
+            elif category.startswith('goods:') and not payer.startswith('firm:'):
+                self.quantities[good]-=qty
         if amount == 0:
             return
         if amount < 0:
@@ -39,4 +47,4 @@ class Ledger:
         return day
 
     def state(self):
-        return dict(accounts=dict(self.accounts), totals=dict(self.totals), today=dict(self.today), journal=list(self.journal))
+        return dict(accounts=dict(self.accounts), totals=dict(self.totals), today=dict(self.today), journal=list(self.journal),quantities=dict(self.quantities))

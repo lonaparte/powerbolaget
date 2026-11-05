@@ -31,6 +31,8 @@ from . import history as H
 from .exchange import message
 from . import protection as P
 from . import dynamics as D
+from . import materials as M
+from . import water as U
 from .calendar import DAY, HOUR, is_rest_day, label, month_index, parts, stamp
 from .events import EventQueue
 from .ledger import Ledger
@@ -56,6 +58,8 @@ class World:
             self._fresh(seed)
         else:
             self._load(state)
+        self.material_baseline=(state or {}).get('material_baseline') or M.baseline(self)
+        self.conservation_history=(state or {}).get('conservation_history',[])
         if getattr(self, 'network', None) is None:
             self.network = G.Network(self.grid, self.devices, backend)
         self.flows = None
@@ -98,6 +102,7 @@ class World:
         self.construction_backlog = 0.
         self.outage_today = {}
         generate(self)
+        U.create(self)
         self.network = G.Network(self.grid, self.devices, self.backend)
         self.demography['month']['start'] = S.residents(self)
         self.plan_hour(0, prime=True)
@@ -123,6 +128,10 @@ class World:
         self.price_observations = s.get('price_observations', dict(sum=0., hours=0))
         self.grid.setdefault('oil',{})
         P.add_ties(self)
+        self.water=s.get('water')
+        if self.water is None:
+            S.refresh_stats(self)
+            U.create(self)
         self.events.cancel(lambda e: e['kind'] == 'interconnector')
         legacy = self.projects.get('tso_hvac')
         if legacy and legacy['status'] == 'building':
@@ -147,7 +156,8 @@ class World:
                     command_receipts=self.command_receipts, retail_policy=self.retail_policy,
                     retail_version=self.retail_version, contracts=self.contracts, price_observations=self.price_observations,
                     archive=self.archive.state(),messages=self.messages,settled_until=self.settled_until,
-                    entity_hist={k:list(v) for k,v in self.entity_hist.items()},rms=self.rms,frequency_hz=self.frequency_hz)
+                    entity_hist={k:list(v) for k,v in self.entity_hist.items()},rms=self.rms,frequency_hz=self.frequency_hz,
+                    water=self.water,material_baseline=self.material_baseline,conservation_history=self.conservation_history)
 
     @staticmethod
     def _blank_demo():
@@ -276,6 +286,7 @@ class World:
     # ------------------------------------------------------------ minute physics
     def requests(self, t, w):
         ctx = dict(rest=is_rest_day(t))
+        U.targets(self)
         out = {}
         for did, d in self.devices.items():
             if d['kind'] == 'residential':
@@ -529,6 +540,7 @@ class World:
             s['cycles_mwh'] += abs(p)*h
             O.age_storage(s,h)
         O.integrate(self,h,f.get('oil',{}))
+        U.integrate(self,h)
         acc['oil']=acc.get('oil',0.)+sum(f.get('oil',{}).values())*h
         price = self.energy_price(t_from)
         if f['link'] >= 0:
@@ -1032,9 +1044,9 @@ class World:
                 if bal:
                     led.transfer('pop:'+p['id'], 'external', bal, 'visitor spending returned', m)
         # Powerbolaget operation and maintenance, paid daily.
-        wind_mw = sum(t['mw'] for t in self.grid['turbines'].values() if t['status'] != 'construction')
-        grid_km = sum(b['km'] for b in self.grid['branches'].values() if b['kind'] == 'line' and b['id'] != 'hvdc')
-        storage_mw = sum(s['p_mw'] for s in self.grid['storage'].values())
+        wind_mw = sum(t['mw'] for t in self.grid['turbines'].values() if t['status'] not in ('construction','retired'))
+        grid_km = sum(b['km'] for b in self.grid['branches'].values() if b['kind'] == 'line' and b['id'] != 'hvdc' and not b.get('retired'))
+        storage_mw = sum(s['p_mw'] for s in self.grid['storage'].values() if s['status']!='retired')
         om = (wind_mw*WIND_OM_SEK_MW_YEAR+grid_km*GRID_OM_SEK_KM_YEAR+storage_mw*STORAGE_OM_SEK_MW_YEAR)/365
         self.pay_construction('pb', om, m, 'operation and maintenance')
         # The region balances its budget with a state grant; Powerbolaget borrows if cash runs out.
@@ -1045,6 +1057,11 @@ class World:
             self.log('finance', 'Cash shortfall covered by external financing (free-investment rule)', None)
         F.close_day(self, m)
         O.refuel(self,m)
+        U.close_day(self)
+        material_report=M.report(self)
+        self.conservation_history.append(dict(t=m,goods=material_report,money=sum(led.accounts.values()),
+            water={z:U.residual(w) for z,w in self.water.items()}))
+        self.conservation_history=self.conservation_history[-120:]
         E.close_day(self, m)
         for z in self.zones:
             self.outage.setdefault(z['id'], deque(maxlen=120)).append(round(self.outage_today.get(z['id'], 0.), 3))

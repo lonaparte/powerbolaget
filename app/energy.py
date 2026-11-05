@@ -65,7 +65,7 @@ def wake_factors(grid, farm_id, direction, ct):
     hit = _wake_cache.get(key)
     if hit is not None:
         return hit
-    ids = [t for t in grid['farms'][farm_id]['turbines'] if grid['turbines'][t]['status'] != 'construction']
+    ids = [t for t in grid['farms'][farm_id]['turbines'] if grid['turbines'][t]['status'] not in ('construction','retired')]
     heading = radians(direction+180)
     hx, hy = sin(heading), cos(heading)
     out = {}

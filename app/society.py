@@ -8,6 +8,7 @@ spending by preference and price). Tourism follows arrivals, stays and departure
 births, deaths, ageing and logit migration with housing limits; every change of people is counted.
 """
 from math import exp, hypot
+from .rng import stable_unit
 from . import economy as E
 from .calendar import parts, is_rest_day
 from .loads import bump
@@ -23,7 +24,8 @@ PREFERENCES = dict(consumer=.30, food=.0021)      # baskets and tonnes per perso
 
 def pop(pid, kind, zone, group, count, **extra):
     return dict(id=pid, kind=kind, zone=zone, group=group, count=int(count), employed=0, income_ema=0.,
-                prefs=dict(consumer=1.0, food=1.0), elasticity=.6, inertia=.9, provenance='synthetic', **extra)
+                prefs=dict(consumer=.85+.30*stable_unit(pid,'consumer'),food=.9+.2*stable_unit(pid,'food')),
+                elasticity=.4+.4*stable_unit(pid,'elasticity'),inertia=.8+.18*stable_unit(pid,'inertia'),provenance='synthetic', **extra)
 
 
 def residents(world, zone=None):
@@ -114,6 +116,7 @@ def tourism_day(world, minute):
         demo['tourist_departures'] += leaving
         tp['departing'] = leaving
         wish = island_arrivals*f['beds']/total_beds*(.7+.6*world.zone_by_id[f['zone']]['amenity'])
+        wish*=max(.2,world.water.get(f['zone'],{}).get('availability',1.))
         free = max(0, f['beds']-tp['count'])
         arriving = min(stochastic_round(rng, wish), free)
         tp['count'] += arriving
@@ -226,14 +229,21 @@ def daily(world, minute):
 
 def record_income(world):
     """Update each POP's income EMA from the expected daily income (for spending decisions)."""
+    earnings={}
+    for fid,jobs in world.jobs.items():
+        f=world.firms[fid]
+        if f['status'] not in ('operating','construction'):
+            continue
+        wage=f.get('wage_offer',WAGE[f['sector']])*SHIFT_HOURS*(1-INCOME_TAX)*5/7
+        for pid,count in jobs.items():
+            earnings[pid]=earnings.get(pid,0.)+count*wage
     for p in world.pops.values():
         n = p['count']
         if n <= 0 or p['kind'] in ('tourist', 'holiday'):
             continue
         if p['group'] in SECTORS:
-            wage = WAGE[p['group']]*SHIFT_HOURS*(1-INCOME_TAX)*5/7
             inactive = p.get('inactive', 0)
-            income = p['employed']*wage+(n-p['employed']-inactive)*UNEMPLOYMENT_DAY+inactive*UNEMPLOYMENT_DAY*.7
+            income = earnings.get(p['id'],0.)+(n-p['employed']-inactive)*UNEMPLOYMENT_DAY+inactive*UNEMPLOYMENT_DAY*.7
         elif p['group'] == 'retired':
             income = n*PENSION_DAY
         else:
@@ -294,7 +304,7 @@ def monthly(world, minute):
             continue
         unemployed = p['count']-p['employed']-p.get('inactive', 0)
         outage_push = min(.01, world.zone_outage_hours(p['zone'], 90)/2500)
-        rate = MOVE_RATE/12*(.25 if p['group'] == 'retired' else 1)
+        rate = MOVE_RATE/12*(.25 if p['group'] == 'retired' else 1)*(1-p['inertia'])/.1
         movers = stochastic_round(rng, unemployed*(rate*3)+p['employed']*rate*.15+p['count']*outage_push)
         movers = min(movers, p['count'])
         if movers <= 0:
@@ -311,7 +321,7 @@ def monthly(world, minute):
             weights.append((z['id'], u))
         top = max([u for _, u in weights]+[here])
         probs = [(zid, exp((u-top)/.35)) for zid, u in weights]
-        probs.append(('stay', exp((here+.4-top)/.35)))
+        probs.append(('stay', exp((here+.4*p['inertia']/.9-top)/.35)))
         total = sum(w for _, w in probs)
         for zid, w in probs:
             k = min(p['count'], stochastic_round(rng, movers*w/total))
@@ -429,6 +439,7 @@ def zone_utilities(world):
     jobs_near = {}
     for z in world.zones:
         open_jobs, staff = {}, {}
+        wages,commute,weight={}, {}, {}
         for f in world.firms.values():
             if f['status'] != 'operating':
                 continue
@@ -439,14 +450,22 @@ def zone_utilities(world):
             w = exp(-d/18)
             open_jobs[f['sector']] = open_jobs.get(f['sector'], 0)+w*max(0, f['desired_staff']-f['staff'])
             staff[f['sector']] = staff.get(f['sector'], 0)+w*f['staff']
-        jobs_near[z['id']] = (open_jobs, staff)
+            k=f['sector'];n=w*max(1,f['staff'])
+            wages[k]=wages.get(k,0.)+n*f.get('wage_offer',WAGE[k])
+            commute[k]=commute.get(k,0.)+n*d
+            weight[k]=weight.get(k,0.)+n
+        jobs_near[z['id']] = (open_jobs, staff,wages,commute,weight)
     for z in world.zones:
-        open_jobs, staff = jobs_near[z['id']]
+        open_jobs, staff,wages,commute,weight = jobs_near[z['id']]
         households = st['zone_residents'].get(z['id'], 0)/HOUSEHOLD_SIZE
         tight = households/max(1, z['housing_units'])
         outage = world.zone_outage_hours(z['id'], 90)
         for g in GROUPS:
             jobs = (open_jobs.get(g, 0)+.2*staff.get(g, 0)**.5)/(1+st['zone_unemployed'].get(z['id'], 0)**.5)
             u = (.9*min(2., jobs/10) if g in SECTORS else 0.)+.7*z['amenity']-1.2*max(0., tight-.97)-.06*outage/24
+            if g in SECTORS and weight.get(g,0.)>0:
+                u+=.35*(wages[g]/weight[g]/200.-1)-.008*commute[g]/weight[g]
+            u-=.06*world.tariff('household',world.minute,'pop:'+z['id']+'_'+g)*(1.15 if z['direct']>.3 else 1.)
+            u-=.8*(1-world.water.get(z['id'],{}).get('availability',1.))
             out[(z['id'], g)] = u
     return out

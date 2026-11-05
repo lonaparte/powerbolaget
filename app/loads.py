@@ -96,6 +96,8 @@ def request(d, t, w, ctx):
     """Requested MW of a device at minute t (may be fractional) given weather w."""
     h = (t % 1440)/60
     kind = d['kind']
+    if kind=='water':
+        return d['p_target']
     if kind == 'equipment':
         return equipment_power(d, t, ctx)
     s = lerp_scale(d, t)

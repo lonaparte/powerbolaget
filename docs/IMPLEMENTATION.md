@@ -77,3 +77,8 @@ without a public source are assumptions and must be visible as such in the model
   Rejected stale voltage timers and overly weak VSC filter impedance through regression testing.
   Validation: 52 Python checks passed; two added native/analytic reference checks plus related
   regressions (11 checks) and 5 browser workflows passed. Full final suite will include all 54.
+- Batch 6: per-good stock accounts, recorded farm inputs/outputs, public pumping
+  and finite-water storage with shortage feedback, heterogeneous POP behavior, real wage offers and
+  commuting/contract-cost utility, legacy-save migration, and retired-asset cost/wake/site cleanup.
+  Validation: all 58 Python checks and 5 browser workflows passed, including per-good and water
+  stock identities after daily trading and settlement. Started a 30-day autonomous trace.

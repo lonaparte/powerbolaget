@@ -74,7 +74,8 @@ PB.inspector = (() => {
         ['Visitors in lodging', PB.int(d.tourists) + ` (beds ${PB.int(d.beds)})`], ['Holiday-home users', PB.int(d.holiday) + ` (homes ${PB.int(d.holiday_homes)})`],
         ['Seasonal workers', PB.int(d.seasonal)], ['Labour force / unemployed', `${PB.int(d.working)} / ${PB.int(d.unemployed)} (${PB.pct(d.unemployed / Math.max(1, d.working), 1)})`],
         ['Electric heating', `${PB.pct(d.heating.direct)} direct · ${PB.pct(d.heating.heat_pump)} heat pumps`], ['Indoor temperature', PB.fmt(d.indoor_c, 1) + ' °C'],
-        ['Customer outage, 30 days', PB.fmt(d.outage_h_30d, 2) + ' h'], ['20 kV supply voltage', PB.fmt(d.bus_v, 4) + ' pu']])
+        ['Customer outage, 30 days', PB.fmt(d.outage_h_30d, 2) + ' h'], ['20 kV supply voltage', PB.fmt(d.bus_v, 4) + ' pu'],
+        ['Water storage',PB.fmt(d.water.volume_m3,1)+' / '+PB.fmt(d.water.capacity_m3,1)+' m³'],['Water availability, yesterday',PB.pct(d.water.availability,1)],['Unserved water',PB.fmt(d.water.unmet_m3,1)+' m³']])
         + `<h3>LOAD NOW · ${PB.mw(total)}</h3><div class="stack">${Object.entries(comp).map(([k, v]) => `<i title="${k} ${PB.fmt(v, 2)} MW" style="width:${100 * v / total}%;background:var(${colors[k] || '--gray'})"></i>`).join('')}</div>`
         + `<div class="small">${Object.entries(comp).map(([k, v]) => `<span style="color:var(${colors[k] || '--gray'})">■</span> ${k} ${PB.fmt(v, 2)}`).join(' · ')}</div>`
         + `<h3>HOUSEHOLD ENERGY, LAST ${d.history.length} H</h3><canvas class="mini" data-hist="pair"></canvas>`

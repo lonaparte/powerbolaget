@@ -297,6 +297,7 @@ def zone_view(world, zid):
                 unemployed=st['zone_unemployed'].get(zid, 0), beds=z['beds'], holiday_homes=z['holiday_homes'],
                 heating=dict(direct=z['direct'], heat_pump=z['heat_pump']), indoor_c=r(res['t_in'], 2),
                 outage_h_30d=r(world.zone_outage_hours(zid, 30), 2), load=comp, bus=z['bus'],
+                water=world.water[zid],
                 bus_v=r(f.get('vm', {}).get(z['bus'], 0.), 4), pops=pops,
                 firms=[dict(id=x['id'], name=x['name'], kind=x['kind'], staff=x['staff']) for x in world.firms.values() if x['zone'] == zid],
                 history=list(world.entity_hist.get('res_'+zid, [])), unit='household MWh per hour (served, unserved)')
@@ -313,6 +314,7 @@ def firm_view(world, fid):
                        priority=d['priority'], trips=d.get('trips', 0)))
     return dict(type='firm', id=fid, title=x['name'], kind=x['kind'], sector=x['sector'], zone=x['zone'], bus=x['bus'],
                 status=x['status'], staff=x['staff'], desired_staff=x['desired_staff'], cash=r(led.balance('firm:'+fid)),
+                wage_offer=x.get('wage_offer'),
                 contract=world.contracts.get('firm:'+fid), credit=x.get('credit'), liquidation=x.get('liquidation'),
                 electricity_price=world.tariff(R.category(x), world.minute, 'firm:'+fid),
                 price=r(x['price'], 1), output=x['output'], inventory={k: r(v, 1) for k, v in x['inventory'].items()},
@@ -373,6 +375,7 @@ def table(world, name):
     if name == 'finance':
         cats = sorted(led.totals.items(), key=lambda kv: -kv[1])
         return dict(pb_cash=r(led.balance('pb')), financing=r(-led.balance('financing')), region=r(led.balance('region')),
+                    conservation=world.conservation_history[-1] if world.conservation_history else None,
                     retail_policy=world.retail_policy, retail_version=world.retail_version,
                     loans=[dict(id=f['id'], name=f['name'], status=f['status'], **f['credit'])
                            for f in world.firms.values() if 'credit' in f],

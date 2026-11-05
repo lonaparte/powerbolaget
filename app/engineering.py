@@ -102,7 +102,8 @@ def plan_link(world, technology, p_mw, station, points=None):
 def plan_asset(world, target, action):
     g = world.grid
     asset = g['turbines'].get(target) or g['storage'].get(target) or g.get('oil',{}).get(target) or g['branches'].get(target)
-    if not asset or target == 'hvdc' or asset.get('planned') or asset.get('retired') or asset.get('status') in ('retired','construction'):
+    replace_cells=target in g['storage'] and action=='retrofit' and asset and not asset.get('retired')
+    if not asset or target == 'hvdc' or asset.get('planned') or asset.get('retired') or asset.get('status')=='construction' or (asset.get('status')=='retired' and not replace_cells):
         raise BuildError('Choose a commissioned island asset.')
     if action not in ('decommission', 'retrofit', 'maintenance'):
         raise BuildError('Unknown asset work.')
@@ -119,7 +120,11 @@ def plan_asset(world, target, action):
         rating = asset['mva']
     # Public first-release planning coefficients; never described as real operator quotations.
     days, unit_cost = {'decommission':(30,.25), 'retrofit':(90,.8), 'maintenance':(2,.02)}[action]
-    return dict(kind='asset_work', target=target, action=action, cost=round(rating*unit_cost*1e6), days=days,
+    cost=rating*unit_cost*1e6
+    if replace_cells:
+        from .params import COST
+        cost=asset.get('nominal_e_mwh',asset['e_mwh'])*1.1*COST['storage_mwh']*1e6
+    return dict(kind='asset_work', target=target, action=action, cost=round(cost), days=days,
                 zone=zone_at(node['x'], node['y'], world.zones)['id'], title=f'{action.title()} {target}',
                 connection='Asset unavailable during work; retrofit restores condition and increases rating 10%')
 

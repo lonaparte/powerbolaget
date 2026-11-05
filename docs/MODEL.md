@@ -211,6 +211,23 @@ Three views (island, grid, economy), map layers, a context inspector, parcel det
 Calibrated economic coefficients, tariff pass-through, the turbine dynamic model, HVAC and HVDC control choices, construction costs and durations, and load calibration against public annual statistics are all open. UI usability with students is still to be tested.
 # Confirmed retail and private finance rules
 
+Per-good conservation checks compare opening inventory plus recorded production, recipe consumption,
+imports, exports, household consumption and liquidation against actual inventory. Goods retain their
+own units; money conservation is checked separately. Old saves begin an explicit new accounting epoch.
+Farm feed consumption and biological/harvest outputs are included. Each closed day retains the residuals.
+
+Public waterworks have electrical pumps, finite tanks, delivered demand, shortage and spill counters.
+The stock identity is checked in m³. Assumptions: 0.12 m³/resident-day, 0.22 m³/visitor-day,
+0.65 kWh/m³ pumping, two design-days of tank volume and groundwater available up to pump rating.
+Outages first drain tanks; shortages reduce next-day tourism and residential attractiveness. Drought
+hydrology is outside this first model. Existing public building loads remain distinct from pumping.
+
+POPs have deterministic heterogeneous preferences, elasticity and migration inertia. Monthly firms'
+wage offers respond slowly to persistent vacancies and margins within 85–130% of sector baseline;
+payroll, income forecasts, hiring order and zone utility use those offers. Job access, actual contract
+electricity costs, weighted commute distance, housing, amenity, outages and water enter migration utility.
+Retired assets stop creating operating costs, wake losses and turbine-spacing exclusions.
+
 Important electrical events run at a 20 ms step for ten-second windows. RK4 advances the classical
 swing/virtual-swing equation, first-order droop governor and voltage regulator; native AC algebraic
 solutions feed actual P/Q/V back into these equations. All normal turbine branches remain present;

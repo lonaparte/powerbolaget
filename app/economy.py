@@ -344,13 +344,17 @@ def daily_farm(world, f, minute):
     feed_need = herd*.012
     fed = min(1., inv.get('feed', 0.)/feed_need) if feed_need > 0 else 1.
     inv['feed'] = max(0., inv.get('feed', 0.)-feed_need*fed)
-    milk = herd*.026*(.75+.25*fed)
-    inv['milk'] += milk
-    inv['livestock'] += herd*.0011
+    consumed=f.setdefault('materials',{}).setdefault('consumed',{})
+    consumed['feed']=consumed.get('feed',0.)+feed_need*fed
+    labor=labor_fraction(f)
+    milk = herd*.026*(.75+.25*fed)*labor
+    produce(f,'milk',milk,{})
+    produce(f,'livestock',herd*.0011*labor,{})
     if harvest_day(minute):
         wet = world.weather_now['humidity_pct'] > 93
         grain = 0. if wet else f['crop_ha']*f['capacity_factor']*5.4/40
-        inv['grain'] += grain
+        grain*=labor
+        produce(f,'grain',grain,{})
         f['today']['produced'] += grain
     f['today']['produced'] += milk
 
@@ -522,7 +526,7 @@ def pay_wages(world, minute):
         continuous = f['kind'] in ('hospital', 'hospitality', 'cement', 'port', 'dairy', 'public', 'agriculture')
         if rest and not continuous:
             continue
-        daily = WAGE[sector]*SHIFT_HOURS*(5/7 if continuous else 1)
+        daily = f.get('wage_offer',WAGE[sector])*SHIFT_HOURS*(5/7 if continuous else 1)
         payer = 'region' if f['kind'] in ('public', 'hospital') else 'firm:'+fid
         for pid, n in staff.items():
             if n <= 0:
@@ -581,7 +585,15 @@ def labour_month(world, minute):
         if f['status'] != 'operating':
             continue
         f['desired_staff'] = desired_staff(world, f)
-    for f in sorted(world.firms.values(), key=lambda f: f['id']):
+    for f in world.firms.values():
+        if f['status']!='operating':
+            continue
+        base=WAGE[f['sector']]
+        wage=f.get('wage_offer',base)
+        vacancy=max(0,f['desired_staff']-f['staff'])/max(1,f['desired_staff'])
+        change=.01 if vacancy>.10 and world.ledger.balance('firm:'+f['id'])>0 else -.005 if f['ema_margin']<0 else 0.
+        f['wage_offer']=max(.85*base,min(1.3*base,wage*(1+change)))
+    for f in sorted(world.firms.values(), key=lambda f: (-f.get('wage_offer',WAGE[f['sector']]),f['id'])):
         if f['status'] != 'operating':
             continue
         staff = world.jobs.setdefault(f['id'], {})
