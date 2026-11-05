@@ -1,5 +1,5 @@
 {
-  "git_commit": "d0ad0579773ae2470a4d4a7dbc52a62c57c4b212",
+  "git_commit": "ef3afcb2c25fe40ef82e0d2d175d9c0781caedca",
   "python": "3.12.14",
   "processor": "AMD EPYC 9V74 80-Core Processor",
   "method": "One-at-a-time isolated subprocesses; seed 1; identical first three winter days; no player actions",

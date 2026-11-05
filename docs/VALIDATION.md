@@ -6,11 +6,10 @@ coefficients into measured facts.
 
 ## Provenance
 
-The final regression run on 5 November 2026 used commit `416309b` plus documentation-only edits on
+The final regression run on 5 November 2026 used commit `ef3afcb` plus documentation-only edits on
 Linux 6.18, Python 3.12.14 and an AMD EPYC 9V74 host with a four-CPU cgroup quota. Dependencies are
 pinned in `requirements.lock`, including OpenDSSDirect.py 0.9.4, DSS-Python 0.15.7 and NumPy 1.26.4.
-The scale, sensitivity and browser artifacts identify their exact source commit (`d0ad057`); the next
-commit changed documentation and stored those artifacts, not simulation or client behaviour.
+The scale, sensitivity and browser artifacts identify the same exact source commit.
 
 Commands and results:
 
@@ -93,13 +92,13 @@ simulated hour; wall time on a shared host is not used as a portable target.
 
 | Fixture | POPs | Turbines | Buses / branches | CPU ms/sim-h | Solve mean / p95 ms | Peak RSS MiB | Save MB | Failures |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Opening scale | 190 | 54 | 161 / 184 | 651.9 | 2.50 / 3.12 | 48.7 | 0.44 | 0 |
-| Medium | 2,000 | 180 | 413 / 436 | 1,061.4 | 5.65 / 7.46 | 57.3 | 1.59 | 0 |
-| Large | 6,000 | 360 | 773 / 796 | 1,666.9 | 10.59 / 13.24 | 73.6 | 3.74 | 0 |
-| Full object limit | 10,000 | 600 | 1,253 / 1,276 | 2,373.3 | 15.19 / 21.72 | 97.4 | 6.08 | 0 |
+| Opening scale | 190 | 54 | 161 / 184 | 672.7 | 2.47 / 3.12 | 48.7 | 0.44 | 0 |
+| Medium | 2,000 | 180 | 413 / 436 | 1,068.5 | 5.64 / 7.03 | 57.2 | 1.59 | 0 |
+| Large | 6,000 | 360 | 773 / 796 | 1,730.9 | 10.93 / 13.77 | 73.3 | 3.74 | 0 |
+| Full object limit | 10,000 | 600 | 1,253 / 1,276 | 2,389.9 | 16.03 / 20.88 | 97.4 | 6.08 | 0 |
 
 All four served 100% of requested energy, preserved 55,300 residents and kept job assignments and goods
-accounts consistent. Two worker processes each advanced a four-hour session in 1.559 s wall time with
+accounts consistent. Two worker processes each advanced a four-hour session in 1.838 s wall time with
 zero failures.
 
 This is an object-count fixture, not a claim that a calibrated 600-turbine Gutnö system has been
@@ -120,13 +119,13 @@ resets instrumentation, and measures four seconds per map. FPS includes animatio
 
 | World / view | Render mean ms | p95 ms | FPS |
 |---|---:|---:|---:|
-| Opening island | 1.59 | 4.0 | 59.75 |
-| Opening grid | 1.86 | 3.2 | 59.81 |
-| 10k POP / 600 turbine island | 6.32 | 9.2 | 59.76 |
-| 10k POP / 600 turbine grid | 6.96 | 9.4 | 59.74 |
+| Opening island | 1.12 | 2.0 | 59.81 |
+| Opening grid | 1.48 | 2.0 | 59.76 |
+| 10k POP / 600 turbine island | 4.96 | 6.2 | 60.00 |
+| 10k POP / 600 turbine grid | 6.00 | 7.4 | 59.75 |
 
-The 6.08 MB save loaded through the API and client in 635.7 ms. The POP page fetched and rendered 100
-rows in 290 ms, then fetched 100 distinct rows on page two. The server reported 9,970 positive-count
+The 6.08 MB save loaded through the API and client in 503.8 ms. The POP page fetched and rendered 100
+rows in 174 ms, then fetched 100 distinct rows on page two. The server reported 9,970 positive-count
 rows among 10,000 objects. No page or console errors were captured. This measures headless Chromium on
 one machine; it is not a minimum-client specification.
 

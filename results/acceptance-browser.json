@@ -1,10 +1,10 @@
 {
-  "git_commit": "d0ad0579773ae2470a4d4a7dbc52a62c57c4b212",
+  "git_commit": "ef3afcb2c25fe40ef82e0d2d175d9c0781caedca",
   "method": "Headless Chromium, 1366x860, 4 seconds per map view after counter reset; FPS includes animation-frame scheduling",
   "chromium": "154.0.8037.57",
   "cpu": "AMD EPYC 9V74 80-Core Processor",
   "save_bytes": 6083011,
-  "load_round_trip_ms": 635.7000000011176,
+  "load_round_trip_ms": 503.80000000074506,
   "counts": {
     "pops": 10000,
     "turbines": 600,
@@ -14,37 +14,37 @@
   "baseline": {
     "island": {
       "samples": 240,
-      "render_mean_ms": 1.5924999999503295,
-      "render_p95_ms": 4,
-      "fps": 59.75298764939916,
+      "render_mean_ms": 1.1199999999720602,
+      "render_p95_ms": 2,
+      "fps": 59.808313105283226,
       "scope": "last 600 animation frames"
     },
     "grid": {
-      "samples": 239,
-      "render_mean_ms": 1.8640167363471192,
-      "render_p95_ms": 3.200000001117587,
-      "fps": 59.808011257972986,
+      "samples": 240,
+      "render_mean_ms": 1.4837499999130765,
+      "render_p95_ms": 2,
+      "fps": 59.75746968371046,
       "scope": "last 600 animation frames"
     }
   },
   "full": {
     "island": {
-      "samples": 240,
-      "render_mean_ms": 6.319583333275902,
-      "render_p95_ms": 9.199999999254942,
-      "fps": 59.76045808018073,
+      "samples": 241,
+      "render_mean_ms": 4.956431535346998,
+      "render_p95_ms": 6.200000001117587,
+      "fps": 59.99999999999999,
       "scope": "last 600 animation frames"
     },
     "grid": {
-      "samples": 239,
-      "render_mean_ms": 6.958158995831487,
-      "render_p95_ms": 9.399999998509884,
-      "fps": 59.74045533273652,
+      "samples": 240,
+      "render_mean_ms": 5.99916666666201,
+      "render_p95_ms": 7.399999998509884,
+      "fps": 59.75,
       "scope": "last 600 animation frames"
     }
   },
   "pop_table": {
-    "load_and_render_ms": 290,
+    "load_and_render_ms": 174,
     "rows_per_page": 100,
     "second_page_rows": 100,
     "page_text": "1 / 100 · 9,970 rows",
