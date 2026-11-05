@@ -166,8 +166,11 @@ least 0.90 pu and current stays within the tie rating. The islet sea cable has n
 Short-circuit studies run on the actual switched network and enabled forming sources in a separate
 solver context. IEC 60255 standard-inverse overcurrent relays use measured current, 1.25 times continuous
 rating pickup, TMS 0.08, 60 ms breaker delay and 300 ms upstream grading per zone. Relay-disabled and
-below-pickup cases stay explicit. Thermal overload protection and repair/reclose logic operate on their
-own time scales.
+below-pickup cases stay explicit. If converter limiting prevents overcurrent pickup while the actual
+fault-bus voltage remains below 0.5 pu for five seconds, a separately labelled sustained-undervoltage
+fault backup isolates the faulted element; this is a proxy for omitted distance/differential protection,
+not prospective current substituted for measured current. Thermal overload protection and
+repair/reclose logic operate on their own time scales.
 
 An important fault or source transition opens a ten-second, 20 ms positive-sequence RMS window.
 Classical/virtual swing equations, first-order droop and voltage regulators advance with RK4; native AC
@@ -234,6 +237,12 @@ browser performance and sensitivity. The source inputs stored with the model are
 - `app/island-wind.json`: Global Wind Atlas v4 mean wind at 100 m, CC BY 4.0, including source URL and
   the transformation into game cells;
 - `app/weather.py`: the Visby station daily-range source and the documented hourly-fit summaries.
+
+The design's macro comparison references are [regional wind generation and capacity](https://www.regionfakta.com/gotlands-lan/energi/vindkraft/),
+[regional final electricity use](https://www.regionfakta.com/gotlands-lan/energi/elforbrukning-slutlig-anvandare/)
+and [Svenska kraftnät's Gotland connection project](https://www.svk.se/utveckling-av-kraftsystemet/transmissionsnatet/transmissionsnatsprojekt/gotland/om-projektet/).
+They provide scale and background only. Their publication years are not combined into a claimed single
+real-world snapshot, and the HVAC page does not cause construction inside the game.
 
 Published Gotland electricity, population and industry totals are macro comparison points. They do not
 validate individual fictional zones or firms. Model coefficients without a cited input are assumptions.

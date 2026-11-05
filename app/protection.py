@@ -8,6 +8,13 @@ from math import sqrt
 from . import grid as G
 
 
+# Independent severe-fault backup. This represents the distance/differential/undervoltage protection
+# omitted from the first-release relay detail; it never substitutes prospective current for measured
+# overcurrent progress. It operates only while the actual fault bus remains deeply depressed.
+PERSISTENT_FAULT_BACKUP_S = 5.0
+PERSISTENT_FAULT_V_PU = .5
+
+
 def inverse_time(current,pickup,tms=.08):
     multiple=current/pickup if pickup>0 else 0.
     return .06+.14*tms/(multiple**.02-1.) if multiple>1 else None

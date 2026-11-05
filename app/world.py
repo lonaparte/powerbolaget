@@ -136,6 +136,14 @@ class World:
             S.refresh_stats(self)
             U.create(self)
         self.events.cancel(lambda e: e['kind'] == 'interconnector')
+        for br in self.grid['branches'].values():
+            fault=br.get('active_fault')
+            if not fault or self.events.pending(lambda e:e['kind']=='fault_guard' and e.get('id')==br['id']):
+                continue
+            relay=next(iter(self.events.pending(lambda e:e['kind'] in ('relay_check','relay_trip') and e.get('id')==br['id'])),{})
+            when=max(self.minute+1e-6,fault.get('since',self.minute)+P.PERSISTENT_FAULT_BACKUP_S/60)
+            self.events.push(when,'fault_guard','protection',id=br['id'],permanent=relay.get('permanent',True),
+                             cause=relay.get('cause','persisted severe fault'))
         legacy = self.projects.get('tso_hvac')
         if legacy and legacy['status'] == 'building':
             legacy['status'] = 'cancelled'
@@ -596,6 +604,8 @@ class World:
             self.clear_fault(ev)
         elif kind == 'relay_check':
             return self.relay_check(ev)
+        elif kind == 'fault_guard':
+            return self.fault_guard(ev)
         elif kind == 'rms_step':
             D.step(self,t)
         elif kind == 'voltage_trip':
@@ -656,6 +666,8 @@ class World:
             selected=study['selected']
             br['protection_study']=study
             br['active_fault']=dict(bus=study['fault_bus'],r=study['resistance_ohm'],since=t)
+            self.events.push(t+P.PERSISTENT_FAULT_BACKUP_S/60,'fault_guard','protection',id=br['id'],
+                             permanent=permanent,cause=ev['cause'])
             if selected is None:
                 self.log('protection',f"Fault current {study['current_a']:.0f} A is below all enabled pickups; automatic overcurrent clearing unavailable",None,branch=br['id'])
                 return
@@ -714,7 +726,8 @@ class World:
         if not br.get('active_fault'):
             return
         br.pop('active_fault',None)
-        self.trip_branch(ev['relay'],t,ev['cause']+' · overcurrent relay',permanent=ev['permanent'])
+        mechanism=ev.get('mechanism','overcurrent relay')
+        self.trip_branch(ev['relay'],t,ev['cause']+' · '+mechanism,permanent=ev['permanent'])
         if ev['relay']!=br['id']:
             self.trip_branch(br['id'],t,'faulted segment isolated following backup trip',permanent=ev['permanent'])
             self.events.push(t+10,'restore','restore',id=ev['relay'],reason='backup reset after fault isolation')
@@ -727,6 +740,20 @@ class World:
             plan=N.sectionalise(self,br)
             if plan and plan[0]<br['repair_until']-t:
                 self.events.push(t+plan[0],'restore','restore',id=br['id'],reason='sectionalised')
+
+    def fault_guard(self,ev):
+        """Isolate a severe persistent fault when converter limiting prevents overcurrent pickup."""
+        br=self.grid['branches'].get(ev['id'])
+        if not br or not br.get('active_fault'):
+            return False
+        bus=br['active_fault']['bus']
+        vm=(self.flows or {}).get('vm',{}).get(bus)
+        if not self.physics_valid or vm is None or vm>P.PERSISTENT_FAULT_V_PU:
+            return False
+        br['relay_result']=dict(relay=br['id'],pickup_time=ev['time'],voltage_pu=vm,
+                                mechanism='sustained-undervoltage fault backup')
+        self.clear_fault(dict(ev,relay=br['id'],mechanism='sustained-undervoltage fault backup'))
+        return False
 
     def relay_check(self,ev):
         br=self.grid['branches'][ev['id']]

@@ -42,7 +42,7 @@ def main():
     ap.add_argument('--resume',type=Path,help='continue from a benchmark checkpoint')
     ap.add_argument('--checkpoint-every',type=int,default=10)
     a = ap.parse_args()
-    # Capture provenance before importing/advancing any checkpointed state. The branch may receive
+    # Capture provenance before constructing/advancing any world state. The branch may receive
     # documentation or UI commits while a long annual run is active.
     source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     t0 = time.perf_counter()

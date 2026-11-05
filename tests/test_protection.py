@@ -34,3 +34,16 @@ def test_transfer_is_rejected_when_the_real_tie_is_overloaded():
     assert not tie['closed'] and br['tripped']
     assert w.devices['res_z06']['served']==0
     assert any('transfer rejected' in e['text'] for e in w.logbook)
+
+
+def test_current_limited_hvdc_backup_cannot_leave_a_severe_fault_connected():
+    w=World(seed=1)
+    w.advance(2)
+    br=w.grid['branches']['l_kal_rom']
+    w.events.push(w.minute+.1,'fault','protection',target='branch',id=br['id'],cause='guard test',permanent=True)
+    w.advance(1)
+    assert br['protection_study']['selected']['branch']=='hvdc'
+    assert br['tripped'] and 'active_fault' not in br
+    assert br['relay_result']['mechanism']=='sustained-undervoltage fault backup'
+    assert any('sustained-undervoltage fault backup' in e['text'] for e in w.logbook)
+    assert w.perf['failures']==0
