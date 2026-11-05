@@ -125,7 +125,7 @@ def model(grid, devices):
             kv = grid['buses'][s['bus']]['kv']
             elements.append(Generator(s['id'], s['bus'], kv, s['p_mw']*1100))
             if s['grid_forming']:
-                elements.append(GridFormer(s['id']+'_gf', s['bus'], kv, max(50., 6*s['p_mw'])))
+                elements.append(GridFormer(s['id']+'_gf', s['bus'], kv, max(50., 20*s['p_mw'])))
     for g in grid.get('oil',{}).values():
         kv=grid['buses'][g['bus']]['kv']
         elements.append(Generator(g['id'],g['bus'],kv,g['p_mw']*1100))
@@ -149,6 +149,7 @@ class Network:
         self.result = None
         self.dirty = True
         self.energized = set()
+        self.reference_overrides={}
 
     def compile(self):
         update_source(self.grid)
@@ -201,10 +202,15 @@ class Network:
         gen = {k: (p*1000, q*1000) for k, (p, q) in generators.items()}
         scale = sum(abs(p) for p, _ in loads.values())+sum(abs(p) for p, _ in generators.values())+5
         for attempt in range(2):
+            self.solver.set_faults({bid:b['active_fault'] for bid,b in self.grid['branches'].items() if b.get('active_fault') and in_service(b)})
+            for name,values in self.reference_overrides.items():
+                self.solver.set_reference(name,*values)
             self.solver.set_powers(kw, gen)
             self.solver.solve()
             res = self.solver.results()
-            if res.converged and plausible(res, scale):
+            faulting=any(b.get('active_fault') for b in self.grid['branches'].values())
+            check_scale=max(scale,5*abs(res.source_p_mw)+5*sum(abs(p) for p,q in res.formers.values())) if faulting else scale
+            if res.converged and plausible(res, check_scale):
                 break
             res.converged = False
             if attempt == 0:

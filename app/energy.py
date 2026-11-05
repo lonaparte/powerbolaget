@@ -161,6 +161,9 @@ def sync_formers(world, t):
         if bool(u.get('forming_active'))!=enable:
             world.network.set_forming(u['id'],enable)
             world.log('protection',f"{u['name']} {'takes over' if enable else 'releases'} voltage/frequency reference",None,source=u['id'])
+            if enable:
+                from . import dynamics as D
+                D.start(world,t,'island reference takeover '+u['id'])
     if chosen:
         for tb in world.grid['turbines'].values():
             if tb['grid_wait']>=1e12 and tb['bus_lv'] in world.network.energized:
@@ -189,6 +192,12 @@ def dispatch(world, t, requests, avail):
     for tid in avail:
         if tid not in wind:
             avail[tid] = 0.
+    if world.frequency_hz>50.2:
+        factor=max(0.,1.-(world.frequency_hz-50.2)/1.3)
+        wind={k:p*factor for k,p in wind.items()}
+    if settings.get('frequency_shed'):
+        shed(by_class,requests,served,load*settings['frequency_shed'])
+        load=sum(requests[k][0]*share for k,share in served.items())
     w_total = sum(wind.values())
     losses = world.last_losses if world.last_losses else .02*load
     cap = link_capacity(world)
@@ -203,6 +212,8 @@ def dispatch(world, t, requests, avail):
     price, avg = world.energy_price(t), world.price_avg
     for sid, s in storage.items():
         st_mw[sid] = storage_setpoint(s, need, imp_cap, exp_cap, price, avg, islanded)
+        need-=st_mw[sid]
+    need+=sum(st_mw.values())
     engine = next((s for s in grid.get('oil',{}).values() if s.get('forming_active')),None)
     former = next((sid for sid, s in storage.items() if s.get('forming_active')), None)
     if islanded and former:
@@ -261,8 +272,12 @@ def dispatch(world, t, requests, avail):
 
 def storage_setpoint(s, need, imp_cap, exp_cap, price, avg, islanded):
     mode = s['mode']
-    if mode == 'hold' or islanded:
+    if mode == 'hold':
         return 0.
+    if islanded:
+        if s.get('forming_active'):
+            return 0.
+        return min(discharge_limit(s),max(0.,need)) if need>=0 else -min(charge_limit(s),-need)
     if mode == 'charge':
         return -min(s['setpoint'], charge_limit(s))
     if mode == 'discharge':
@@ -382,6 +397,12 @@ def repair_minutes(world, kind):
 def overload_check(world, t, loading):
     """Inverse-time thermal protection of branches; returns branches to trip now."""
     trips = []
+    if any(b.get('active_fault') for b in world.grid['branches'].values()):
+        # Fault-current clearing belongs to the coordinated relays. A minute-scale thermal
+        # surrogate must not bypass the breaker sequence or strand an uncleared fault.
+        for bid in loading:
+            world.grid['branches'][bid]['stress_t']=t
+        return trips
     for bid, x in loading.items():
         br = world.grid['branches'][bid]
         previous = br.get('stress_t', t)

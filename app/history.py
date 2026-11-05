@@ -118,6 +118,9 @@ def export(world,key='global',resolution='hour',start=0,end=None,event_id=None):
     a=world.archive
     if resolution=='event':
         data=[e for e in a.waveforms if (not event_id or e['id']==event_id) and start<=e['t'] and (end is None or e['t']<=end)]
+        if key!='global':
+            data=[dict(e,fields=e.get('object_fields',[]),samples=e['object_samples'][key],object=key)
+                  for e in data if key in e.get('object_samples',{})]
         return dict(schema='powerbolaget.history/1',resolution='event',events=data,clock_unit='minute',waveform_time_unit='second')
     if resolution not in ('hour','day','minute'):
         raise ValueError('Resolution must be hour, day, minute or event.')
@@ -134,11 +137,11 @@ def as_csv(data):
     out=io.StringIO(newline='')
     writer=csv.writer(out)
     if data['resolution']=='event':
-        writer.writerow(['event','t_minute','sample_json'])
-        import json
+        fields=data['events'][0].get('fields',[]) if data['events'] else []
+        writer.writerow(['event','t [minute]']+[f'{name} [{unit}]' for name,unit in fields])
         for e in data['events']:
             for sample in e.get('samples',[]):
-                writer.writerow([e['id'],e['t'],json.dumps(sample,separators=(',',':'))])
+                writer.writerow([e['id'],e['t']]+sample)
     else:
         writer.writerow([f'{name} [{unit}]' for name,unit in data['fields']])
         writer.writerows(data['rows'])

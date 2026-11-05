@@ -28,7 +28,7 @@ Completion means executable behavior and validation, not just documentation or a
 - [x] Contract-consistent planning, retail policy and bounded private finance/exit.
 - [ ] Editable engineering, oil backup, player-controlled links and asset lifecycle.
 - [ ] Aggregated electrical dynamics, P/Q limits and fault/protection/restoration behavior.
-- [x] Versioned module exchanges, persistent layered history and engineering exports (event producer follows).
+- [x] Versioned module exchanges, persistent layered history and engineering exports.
 - [ ] Client controls, layers, object analysis and event inspection.
 - [ ] Calibration, conservation/reference checks, sensitivity and scale measurements.
 
@@ -69,3 +69,11 @@ without a public source are assumptions and must be visible as such in the model
   overcurrent pickups and primary/backup selection with timed clearing; physical normally-open
   feeder ties, transfer feasibility and normal-topology restoration replace random load fractions.
   Validation: existing 46 Python tests plus 3 new protection checks passed; browser results below.
+- Batch 5b: 20 ms RMS event clock; swing/virtual-swing, droop governor and voltage regulator
+  coupled to native AC network solutions, balanced fault shunts, VSC virtual-impedance limiting,
+  farm frequency response, underfrequency shedding, timed voltage ride-through, actual-current
+  relay integration and breaker delay. Saved control states, global/object waveforms, action chains,
+  CSV/JSON and waveform inspector. Actual P/Q metering includes voltage dependence and fault heat.
+  Rejected stale voltage timers and overly weak VSC filter impedance through regression testing.
+  Validation: 52 Python checks passed; two added native/analytic reference checks plus related
+  regressions (11 checks) and 5 browser workflows passed. Full final suite will include all 54.

@@ -49,6 +49,18 @@ class Backend:
         else:
             self.d(f"edit {kind}.{name} enabled={'yes' if enabled else 'no'}")
 
+    def set_faults(self,faults):
+        existing=getattr(self,'_faults',set())
+        for key in existing-set(faults):
+            self.d(f'edit fault.ev_{key} enabled=no')
+        for key,f in faults.items():
+            verb='edit' if key in existing else 'new'
+            self.d(f'{verb} fault.ev_{key} phases=3 bus1={f["bus"]} r={f["r"]} enabled=yes')
+        self._faults=existing|set(faults)
+
+    def set_reference(self,name,pu,angle,mvasc):
+        self.d(f'edit vsource.{name} pu={pu} angle={angle} mvasc3={mvasc} mvasc1={mvasc}')
+
     def set_generator(self, name, kw=None, kvar=None):
         self.d.Generators.Name(name)
         if kw is not None: self.d.Generators.kW(kw)
@@ -98,6 +110,10 @@ class Backend:
         layout = dict(buses=[nodes[i].partition('.')[0] for i in first], first=np.array(first, dtype=np.intp),
                       rows1=np.array(rows1, dtype=np.intp).reshape(-1, width), rows2=np.array(rows2, dtype=np.intp).reshape(-1, width),
                       names=branch_names, elements=np.array(elements, dtype=np.intp))
+        names=d.Circuit.AllElementNames()
+        layout['pc']=[(i,name.split('.',1)[0].lower(),name.split('.',1)[1].lower()) for i,name in enumerate(names)
+                      if name.lower().startswith(('load.','generator.'))]
+        layout['faults']=[i for i,name in enumerate(names) if name.lower().startswith('fault.')]
         self._cache = (key, layout)
         return layout
 
@@ -127,8 +143,14 @@ class Backend:
                 main = pq
             else:
                 formers[name] = pq
+        element_pq=np.asarray(d.Circuit.AllElementLosses()).reshape(-1,2)/1000.
+        loads,generators={},{}
+        for i,kind,name in lay['pc']:
+            p,q=element_pq[i]
+            (loads if kind=='load' else generators)[name]=(float(p),float(q)) if kind=='load' else (-float(p),-float(q))
+        fault_mw=sum(float(element_pq[i,0]) for i in lay['faults'])
         return Results(bool(d.Solution.Converged()), d.Solution.Iterations(), vm, va, branches, main[0], main[1],
-                       d.Circuit.Losses()[0]/1e6, formers)
+                       d.Circuit.Losses()[0]/1e6+fault_mw, formers,loads,generators,fault_mw)
 
     def solve(self):
         self.d.Solution.Solve()

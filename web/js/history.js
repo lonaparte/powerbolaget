@@ -9,6 +9,21 @@ PB.history = (() => {
     const ids=new Set(['global',...Object.keys(PB.static.buses),...Object.keys(PB.static.branches),...Object.keys(PB.static.turbines),...Object.keys(PB.static.storage),...Object.keys(PB.static.oil||{}),...Object.keys(PB.static.devices||{}),...Object.keys(PB.static.firms),...PB.static.zones.map(z=>'zone:'+z.id)]);
     root.innerHTML=`<h2>TEACHING DATA</h2><form id="dataExport"><label>Object<select name="key">${[...ids].map(id=>`<option value="${PB.esc(id)}" ${id===key?'selected':''}>${PB.esc(PB.name(id))} (${PB.esc(id)})</option>`).join('')}</select></label><label>Resolution<select name="resolution"><option value="hour">Hourly</option><option value="day">Daily</option><option value="minute">Recorded minutes</option><option value="event">Electrical event waveforms</option></select></label><label>From simulation minute<input name="start" type="number" min="0" value="0" required></label><label>Through simulation minute<input name="end" type="number" min="0" value="${PB.snap.minute}" required></label><label>Format<select name="format"><option>csv</option><option>json</option></select></label><div class="actions"><button class="button primary" type="submit">Download</button><button class="button" type="button" id="recordObject">Start minute recording</button><button class="button" type="button" id="stopRecording">Stop recording</button><button class="button" type="button" id="closeData">Close</button></div><p class="small muted">Retention in this save: 7 days hourly, 30 days daily, 24 hours of recorded minutes for up to 8 selected electrical objects, and the latest 8 electrical events. Global day totals remain in the game history. Energy is integrated; voltage and power are snapshots. Export regularly for longer studies.</p><p id="dataStatus" class="small" role="status"></p></form>`;
     const form=root.querySelector('form'),status=root.querySelector('#dataStatus');
+    const inspect=document.createElement('button');inspect.type='button';inspect.className='button';inspect.textContent='Inspect electrical events';form.append(inspect);
+    inspect.onclick=async()=>{
+      try {
+        const data=await PB.call('/history',{resolution:'event'});
+        root.querySelector('#electricalEvents')?.remove();
+        const box=document.createElement('div');box.id='electricalEvents';
+        box.innerHTML=data.events.length?data.events.slice().reverse().map((e,i)=>`<div class="card"><h3>${PB.esc(e.cause)} · ${PB.esc(e.status)}</h3><p class="small">${PB.fmt(e.t,3)} simulation minutes · ${e.samples.length} samples · ${PB.fmt(e.step_seconds*1000,0)} ms step</p><canvas style="height:120px;width:100%" data-frequency="${i}"></canvas><canvas style="height:100px;width:100%" data-voltage="${i}"></canvas><ul>${e.actions.map(a=>`<li>${PB.fmt(a.seconds,3)} s · ${PB.esc(a.text)}</li>`).join('')}</ul></div>`).join(''):'<p>No electrical event has been recorded yet.</p>';
+        root.append(box);
+        data.events.slice().reverse().forEach((e,i)=>{
+          const f=e.samples.map(s=>s[1]),v=e.samples.map(s=>s[2]);
+          PB.chart.draw(box.querySelector(`[data-frequency="${i}"]`),[{name:'Frequency (Hz)',values:f,color:PB.css('--blue')}],{min:Math.max(0,Math.min(...f)-.05),xlabels:['0 s',`${PB.fmt(e.samples.at(-1)?.[0]||0,1)} s`]});
+          PB.chart.draw(box.querySelector(`[data-voltage="${i}"]`),[{name:'Minimum island voltage (pu)',values:v,color:PB.css('--orange')}],{min:0,xlabels:['0 s',`${PB.fmt(e.samples.at(-1)?.[0]||0,1)} s`]});
+        });
+      }catch(err){status.textContent=err.message;}
+    };
     root.querySelector('#closeData').onclick=()=>dialog.close();
     const recording=async on=>{
       const ok=await PB.command({kind:'record',target:form.elements.key.value,recording:on});

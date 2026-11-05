@@ -70,3 +70,38 @@ def test_opening_a_branch_leaves_a_sane_solution(name):
     solver.set_enabled('line', 'b', True)
     solver.set_powers({'l_mid': (500, 0), 'l_end': (500, 0)}, {})
     assert solver.solve() and solver.results().source_p_mw == pytest.approx(before.source_p_mw, abs=1e-6)
+
+
+def test_two_bus_ac_matches_closed_form_voltage_current_and_losses():
+    """Independent high-voltage root of the exact balanced two-bus power equation."""
+    import math
+    p,q,r,x=2e6,.6e6,.4,.3
+    source_squared=10000.**2/3
+    cross=2*(r*p/3+x*q/3)-source_squared
+    constant=(r*r+x*x)*(p*p+q*q)/9
+    receiving_squared=(-cross+math.sqrt(cross*cross-4*constant))/2
+    current=math.hypot(p,q)/(3*math.sqrt(receiving_squared))
+    expected_pu=math.sqrt(receiving_squared/source_squared)
+    model=GridModel(Source('reference','source',10.,1.,1e9,1e9),[
+        Line('line','source','end',1.,r,x,r,x,0.,0.,1000.),
+        Load('load','end',10.,p/1000,p/math.hypot(p,q),vmin_pu=.7,vmax_pu=1.3)],(10.,))
+    solver=create_solver(model)
+    assert solver.solve()
+    result=solver.results()
+    assert result.bus_vm['end']==pytest.approx(expected_pu,abs=2e-6)
+    assert result.branches['line'][4]==pytest.approx(current,rel=2e-5)
+    assert result.losses_mw==pytest.approx(3*current**2*r/1e6,rel=2e-5)
+
+
+def test_fault_shunt_reports_actual_voltage_dependent_delivery():
+    model=feeder()
+    solver=create_solver(model)
+    solver.set_faults({'test':dict(bus='load',r=.1)})
+    assert solver.solve()
+    result=solver.results()
+    assert result.bus_vm['load']<.3
+    assert result.loads['demand'][0]<.15  # requested 1 MW is not delivered during the sag
+    assert result.fault_mw==pytest.approx(10.**2/.1*result.bus_vm['load']**2,rel=1e-6)
+    assert result.source_p_mw==pytest.approx(result.loads['demand'][0]+result.losses_mw,abs=1e-5)
+    solver.set_faults({})
+    assert solver.solve() and solver.results().loads['demand'][0]==pytest.approx(1.,rel=1e-5)

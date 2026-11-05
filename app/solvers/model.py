@@ -109,6 +109,11 @@ class Results:
     formers: dict = field(default_factory=dict)   # grid-forming sources: {name: (P MW, Q Mvar) injected}
 
 
+    loads: dict = field(default_factory=dict)     # actual P/Q including voltage dependence
+    generators: dict = field(default_factory=dict)
+    fault_mw: float = 0.0  # resistive fault dissipation, included in losses_mw
+
+
 @dataclass
 class GridModel:
     """A complete network. Elements keep their order so every backend builds the same circuit."""
@@ -123,6 +128,12 @@ class Solver(Protocol):
 
     def set_enabled(self, kind: str, name: str, enabled: bool) -> None:
         """Switch an element in or out of service."""
+
+    def set_faults(self, faults: dict) -> None:
+        """Active balanced shunts: {id: {bus, r in ohm}}. Missing faults are disabled."""
+
+    def set_reference(self, name: str, pu: float, angle: float, mvasc: float) -> None:
+        """Controlled positive-sequence voltage reference for RMS event windows."""
 
     def set_generator(self, name: str, kw: Optional[float] = None, kvar: Optional[float] = None) -> None:
         """Set a generator's output; None leaves that quantity unchanged."""

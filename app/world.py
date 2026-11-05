@@ -30,6 +30,7 @@ from . import generation as O
 from . import history as H
 from .exchange import message
 from . import protection as P
+from . import dynamics as D
 from .calendar import DAY, HOUR, is_rest_day, label, month_index, parts, stamp
 from .events import EventQueue
 from .ledger import Ledger
@@ -49,6 +50,8 @@ class World:
         self.backend = backend
         self.archive=H.Archive((state or {}).get('archive'))
         self.messages=(state or {}).get('messages',{})
+        self.rms=(state or {}).get('rms',{})
+        self.frequency_hz=(state or {}).get('frequency_hz',50.)
         if state is None:
             self._fresh(seed)
         else:
@@ -144,7 +147,7 @@ class World:
                     command_receipts=self.command_receipts, retail_policy=self.retail_policy,
                     retail_version=self.retail_version, contracts=self.contracts, price_observations=self.price_observations,
                     archive=self.archive.state(),messages=self.messages,settled_until=self.settled_until,
-                    entity_hist={k:list(v) for k,v in self.entity_hist.items()})
+                    entity_hist={k:list(v) for k,v in self.entity_hist.items()},rms=self.rms,frequency_hz=self.frequency_hz)
 
     @staticmethod
     def _blank_demo():
@@ -170,6 +173,10 @@ class World:
         entry = dict(id=self.next_id('log'), t=round(self.t_now if hasattr(self, 't_now') else self.minute, 3),
                      label=label(self.minute), kind=kind, text=text, zone=zone, **refs)
         self.logbook.append(entry)
+        if D.active(self):
+            win=D.window(self)
+            if win and kind in ('protection','fault','restore','shedding','numerical'):
+                win['actions'].append(dict(seconds=(self.t_now-win['t'])*60,kind=kind,text=text,**refs))
         return entry
 
     # ------------------------------------------------------------ external boundary
@@ -240,8 +247,9 @@ class World:
                     break
                 te = max(ev['time'], self.t_now)
                 self.integrate(te)
-                self.handle(ev)
-                self.solve_now(te)
+                changed=self.handle(ev)
+                if changed is not False:
+                    self.solve_now(te)
             self.integrate(float(m+1))
             self.minute = m+1
             self.perf['minutes'] += 1
@@ -344,16 +352,21 @@ class World:
             if not g.get('forming_active'):
                 g['p']=gens[gid][0]
         t0 = _time.perf_counter()
+        D.prepare(self,self.t_now)
         try:
             res = self.network.solve(loads, gens)
         except Exception as exc:     # a numerical failure is not a blackout
             self.perf['failures'] += 1
             self.log('numerical', f'Power flow failed: {exc}', None)
+            if D.active(self):
+                D.finish(self,'numerical_failure')
             return None
         self.perf['solve_ms'].append((_time.perf_counter()-t0)*1000)
         if not res.converged:
             self.perf['failures'] += 1
             self.log('numerical', 'Power flow did not converge; the last valid state is kept (numerical, not physical).', None)
+            if D.active(self):
+                D.finish(self,'numerical_failure')
         return res
 
     def apply_solution(self, t, w, reqs, served, turb, st, res):
@@ -363,6 +376,21 @@ class World:
                 self.flows = dict(t=t, link=0., losses=0., storage={}, loading={}, dev={}, turb={}, vm={})
             return
         self.last_losses = res.losses_mw
+        for did,(actual,q) in res.loads.items():
+            requested=reqs.get(did,(0.,0.))[0]
+            if requested>1e-9 and actual<requested*served[did]*(1-1e-6):
+                served[did]=max(0.,min(served[did],actual/requested))
+        for tid in turb:
+            if tid in res.generators:
+                turb[tid]=res.generators[tid][0]
+                grid['turbines'][tid]['q']=res.generators[tid][1]
+        for sid in st:
+            if sid in res.generators and not grid['storage'][sid].get('forming_active'):
+                st[sid]=res.generators[sid][0]
+        for gid,g in grid.get('oil',{}).items():
+            if gid in res.generators and not g.get('forming_active'):
+                g['p'],g['q']=res.generators[gid]
+                g['p']=min(g['p_mw'],max(0.,g['p']))
         storage = dict(st)
         oil={gid:(res.formers.get(gid+'_gf',(0.,0.))[0] if g.get('forming_active') else
                   g['p'] if g['state']=='running' and g['status']=='ok' and g['bus'] in self.network.energized else 0.)
@@ -375,6 +403,7 @@ class World:
             if s.get('forming_active'):
                 name = sid+'_gf'
                 storage[sid] = res.formers.get(name, (0., 0.))[0]
+                s['q']=res.formers.get(name,(0.,0.))[1]
         loading = {}
         for bid, (p1, q1, p2, q2, imax) in res.branches.items():
             br = grid['branches'].get(bid)
@@ -385,9 +414,10 @@ class World:
                 loading[bid] = imax/br['amps'] if br['amps'] else 0.
             else:
                 loading[bid] = max(s1, s2)/br['mva'] if br['mva'] else 0.
-        dc = self.hvdc_setpoint if self.grid['source_bus'] == 'mainland_ac' else res.source_p_mw
+        dc = res.generators.get('hvdc_conv',(self.hvdc_setpoint,0.))[0] if self.grid['source_bus'] == 'mainland_ac' else res.source_p_mw
         ac = res.source_p_mw if self.grid['source_bus'] == 'mainland_ac' else 0.
         self.flows = dict(t=t, link=dc+ac, link_dc=dc, link_ac=ac, link_q=res.source_q_mvar, losses=res.losses_mw, storage=storage,
+                          fault_loss_mw=res.fault_mw,
                           loading=loading, branches=res.branches, vm=res.bus_vm, va=res.bus_va,
                           dev={did: (reqs[did][0], served[did]) for did in reqs}, turb=dict(turb),oil=oil)
         self.messages['PhysicalResult']=message(self,'PhysicalResult',t,t,dict(converged=True,
@@ -416,9 +446,14 @@ class World:
                 continue
             v = res.bus_vm.get(tb['bus_lv'], 1.)
             if tb['bus_lv'] in self.network.energized and (v < .85 or v > 1.12):
-                tb['grid_wait'] = t+10
-                self.log('protection', f"{tid.upper()} disconnected on {'under' if v < .85 else 'over'}voltage ({v:.3f} pu)",
-                         None, turbine=tid)
+                if 'voltage_deadline' not in tb:
+                    delay=.15 if v<.2 else 2. if v<.85 else .2
+                    tb['voltage_deadline']=t+delay/60
+                    self.events.push(tb['voltage_deadline'],'voltage_trip','protection',id=tid)
+            else:
+                if tb.pop('voltage_deadline',None) is not None:
+                    self.events.cancel(lambda e:e['kind']=='voltage_trip' and e.get('id')==tid)
+        D.record(self,t)
 
     def tap_control(self, res):
         """On-load tap changers of the 110/20 kV units keep each substation's 20 kV busbar within
@@ -436,6 +471,9 @@ class World:
             step = .0125 if v < 1.0 else -.0125 if v > 1.04 else 0.
             for bid in units:
                 br = self.grid['branches'][bid]
+                if br.get('tap_minute')==int(self.t_now):
+                    continue
+                br['tap_minute']=int(self.t_now)
                 tap = br.get('tap', 1.0)
                 new = round(min(1.1, max(.9, tap+step)), 4)
                 if new != tap:
@@ -527,6 +565,23 @@ class World:
             self.fault(ev)
         elif kind == 'relay_trip':
             self.clear_fault(ev)
+        elif kind == 'relay_check':
+            return self.relay_check(ev)
+        elif kind == 'rms_step':
+            D.step(self,t)
+        elif kind == 'voltage_trip':
+            tb=self.grid['turbines'].get(ev['id'])
+            if tb and tb.get('voltage_deadline')==t and tb['status']=='ok' and (tb.get('vm',1.)<.85 or tb.get('vm',1.)>1.12):
+                tb['grid_wait']=t+10
+                tb.pop('voltage_deadline',None)
+                self.log('protection',f"{tb['id']} voltage ride-through timer expired",None,turbine=tb['id'])
+            else:
+                return False
+        elif kind == 'load_recovery':
+            if N.link_capacity(self)>0:
+                self.settings['frequency_shed']=max(0.,self.settings.get('frequency_shed',0.)-.1)
+                if self.settings['frequency_shed']:
+                    self.events.push(t+1,'load_recovery','restore')
         elif kind == 'restore':
             self.restore(ev)
         elif kind == 'commission':
@@ -551,23 +606,26 @@ class World:
             br = self.grid['branches'].get(ev['id'])
             if not br or not G.in_service(br) or br['repair_until'] is not None:
                 return
+            D.start(self,t,'branch fault '+br['id'])
             try:
                 study=P.study(self,br,ev.get('resistance_ohm',.5))
             except Exception as exc:
                 self.perf['failures']+=1
                 self.log('numerical',f'Fault event not applied: short-circuit study failed ({exc})',None,branch=br['id'])
+                D.finish(self,'numerical_failure')
                 return
             permanent = not (br['kind'] == 'line' and br['type'].startswith('OHL')
                              and self.streams['faults'].random() < N.TRANSIENT_SHARE.get(br['type'], 0))
             permanent=ev.get('permanent',permanent)
             selected=study['selected']
             br['protection_study']=study
+            br['active_fault']=dict(bus=study['fault_bus'],r=study['resistance_ohm'],since=t)
             if selected is None:
                 self.log('protection',f"Fault current {study['current_a']:.0f} A is below all enabled pickups; automatic overcurrent clearing unavailable",None,branch=br['id'])
                 return
-            br['active_fault']=dict(bus=study['fault_bus'],r=study['resistance_ohm'],since=t)
-            self.events.push(t+selected['seconds']/60,'relay_trip','protection',id=br['id'],
-                             relay=selected['branch'],permanent=permanent,cause=ev['cause'])
+            br['relay_progress']={c['branch']:0. for c in study['relays']}
+            br['relay_sample_time']=t
+            self.events.push(t+D.STEP_S/60,'relay_check','protection',id=br['id'],permanent=permanent,cause=ev['cause'])
             self.log('fault',f"{ev['cause']}: {study['current_a']/1000:.2f} kA; {selected['role']} {selected['branch']} clearing in {selected['seconds']:.3f} s",None,branch=br['id'])
         elif target == 'turbine':
             tb = self.grid['turbines'].get(ev['id'])
@@ -583,6 +641,7 @@ class World:
             pole = next(p for p in self.grid['link']['poles'] if p['id'] == ev['id'])
             if pole['status'] != 'ok':
                 return
+            D.start(self,t,'HVDC pole loss '+pole['id'])
             pole['status'] = 'fault'
             pole['until'] = t+N.repair_minutes(self, 'pole')
             self.events.push(pole['until'], 'restore', 'restore', pole=pole['id'], reason='converter repaired')
@@ -632,6 +691,33 @@ class World:
             plan=N.sectionalise(self,br)
             if plan and plan[0]<br['repair_until']-t:
                 self.events.push(t+plan[0],'restore','restore',id=br['id'],reason='sectionalised')
+
+    def relay_check(self,ev):
+        br=self.grid['branches'][ev['id']]
+        if not br.get('active_fault'):
+            return False
+        t=ev['time']
+        dt=max(0.,(t-br['relay_sample_time'])*60)
+        br['relay_sample_time']=t
+        remaining=60.
+        for candidate in br['protection_study']['relays']:
+            bid=candidate['branch']
+            current=(self.flows or {}).get('branches',{}).get(bid,(0.,0.,0.,0.,0.))[4]
+            delay=P.inverse_time(current,candidate['pickup_a'],self.grid['branches'][bid].get('relay',{}).get('tms',.08))
+            if delay is None:
+                br['relay_progress'][bid]=max(0.,br['relay_progress'][bid]-dt/5.)
+                continue
+            operate=max(.001,delay-.06+candidate['depth']*.30)
+            br['relay_progress'][bid]+=dt/operate
+            if br['relay_progress'][bid]>=1.:
+                br['relay_result']=dict(relay=bid,pickup_time=t,current_a=current,progress=br['relay_progress'][bid])
+                self.events.push(t+.06/60,'relay_trip','protection',id=br['id'],relay=bid,
+                                 permanent=ev['permanent'],cause=ev['cause'])
+                return False
+            remaining=min(remaining,operate*(1-br['relay_progress'][bid]))
+        wait=D.STEP_S if D.active(self,t) else max(.02,min(60.,remaining))
+        self.events.push(t+wait/60,'relay_check','protection',id=br['id'],permanent=ev['permanent'],cause=ev['cause'])
+        return False
 
     def trip_branch(self, bid, t, cause, permanent):
         br = self.grid['branches'][bid]
@@ -725,6 +811,7 @@ class World:
         self.grid_lost_turbines(t)
 
     def reconnect_link(self, t):
+        D.start(self,t,'mainland reconnection')
         hv = self.grid['branches']['hvdc']
         hv['tripped'], hv['fault'] = False, None
         for s in G.forming_units(self.grid):

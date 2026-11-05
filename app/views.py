@@ -81,7 +81,7 @@ def snapshot(world, since_log=0):
                     link=r(f.get('link', 0.)), link_cap=r(N.link_capacity(world), 1), link_dc=r(f.get('link_dc', f.get('link', 0.))),
                     link_ac=r(f.get('link_ac', 0.)), cap_dc=r(N.hvdc_capacity(world), 1), cap_ac=r(N.hvac_capacity(world), 1),
                     reference='AC mainland' if grid['source_bus'] == 'mainland_ac' else 'HVDC converter', battery=r(sum(storage.values())),
-                    oil=r(sum(f.get('oil',{}).values())), losses=r(f.get('losses', 0.)), price=r(world.energy_price(world.minute), 3),
+                    frequency_hz=world.frequency_hz,oil=r(sum(f.get('oil',{}).values())), losses=r(f.get('losses', 0.)), price=r(world.energy_price(world.minute), 3),
                     tariff=r(world.tariff('household', world.minute), 3), energized=len(energized), buses=len(grid['buses'])),
         buses={b: [r(f.get('vm', {}).get(b, 0.), 4), r(f.get('va', {}).get(b, 0.), 2), b in energized] for b in grid['buses']},
         branches={b: branch_state(world, b, br, f) for b, br in grid['branches'].items()},

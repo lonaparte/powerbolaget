@@ -211,6 +211,25 @@ Three views (island, grid, economy), map layers, a context inspector, parcel det
 Calibrated economic coefficients, tariff pass-through, the turbine dynamic model, HVAC and HVDC control choices, construction costs and durations, and load calibration against public annual statistics are all open. UI usability with students is still to be tested.
 # Confirmed retail and private finance rules
 
+Important electrical events run at a 20 ms step for ten-second windows. RK4 advances the classical
+swing/virtual-swing equation, first-order droop governor and voltage regulator; native AC algebraic
+solutions feed actual P/Q/V back into these equations. All normal turbine branches remain present;
+farm converters share frequency response. The mainland AC grid is an infinite 50 Hz reference.
+VSC-HVDC and forming batteries use synthetic virtual inertia H=1.5 s, 5% droop and 50 ms governor;
+oil engines H=3 s and 500 ms governor. Converter filter reactance is approximately 0.05 pu, with
+virtual impedance feedback above 1.2 pu current. This is an averaged teaching model, not EMT,
+semiconductor switching, a detailed machine model, or a model of actual Gotland converter equipment.
+
+Overcurrent relay progress integrates actual fault current, with an additional 60 ms breaker delay.
+The prospective short-circuit study selects candidates; it does not prescribe clearing regardless of
+current limiting. Minute-scale thermal surrogates do not bypass the fault relay chain. Voltage
+ride-through delays are 150 ms below 0.2 pu, 2 s below 0.85 pu and 200 ms above 1.12 pu. Obsolete timers
+are cancelled. Underfrequency stages shed 10/25/45% at 48.8/48.2/47.5 Hz. Parameters are assumptions.
+Actual voltage-dependent load delivery, generator output and fault-resistor heat are integrated.
+Event waveforms and source states survive saves. Numerical failure marks the event study as failed;
+it is never relabeled as physical blackout. Independent linear-state and two-bus analytic references
+are exercised in tests; parameter calibration and wider scenario acceptance are separate checks.
+
 Fault studies use the actual switched network and enabled forming sources in a separate solver
 context. IEC 60255 standard-inverse overcurrent relays use measured branch fault current, 1.25×
 continuous-current pickup, TMS 0.08, 60 ms breaker time and 300 ms upstream grading per zone.
