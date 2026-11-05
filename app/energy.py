@@ -61,7 +61,9 @@ _wake_cache = {}
 
 def wake_factors(grid, farm_id, direction, ct):
     """Speed factor for each turbine of a farm: Jensen top-hat wakes, root-sum-square superposition."""
-    key = (farm_id, round(direction), round(ct, 2), grid.get('version', 0))
+    geometry=hash(tuple((tid,grid['turbines'][tid]['x'],grid['turbines'][tid]['y'],grid['turbines'][tid]['rotor'],grid['turbines'][tid]['status'])
+                        for tid in grid['farms'][farm_id]['turbines']))
+    key = (farm_id, round(direction), round(ct, 2), grid.get('version', 0),geometry)
     hit = _wake_cache.get(key)
     if hit is not None:
         return hit

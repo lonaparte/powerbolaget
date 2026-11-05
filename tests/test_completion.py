@@ -124,3 +124,27 @@ def test_surplus_cash_repays_private_debt_with_interest():
     w.ledger.transfer('bank', 'firm:'+f['id'], 2e6, 'test loan')
     F.close_day(w, 1440)
     assert c['interest'] > 0 and c['repaid'] > 0 and c['debt'] < 100_000.
+
+
+def test_wake_cache_cannot_mix_independently_edited_worlds():
+    a,b=World(seed=1),World(seed=1)
+    farm=next(iter(a.grid['farms']))
+    ids=a.grid['farms'][farm]['turbines']
+    assert len(ids)>1
+    for w,spacing in ((a,.1),(b,4.)):
+        for i,tid in enumerate(ids):
+            w.grid['turbines'][tid].update(x=30.,y=50.+i*spacing)
+    first=N.wake_factors(a.grid,farm,0.,.8)
+    second=N.wake_factors(b.grid,farm,0.,.8)
+    assert first!=second
+    assert N.wake_factors(a.grid,farm,0.,.8)==first
+
+
+def test_whole_session_timings_keep_early_outliers_after_recent_window():
+    from app.metrics import Timing
+    timing=Timing()
+    for _ in range(1000):timing.add(100.)
+    for _ in range(3000):timing.add(1.)
+    s=timing.summary()
+    assert s['count']==4000 and s['mean_ms']==25.75
+    assert 100.<=s['p95_ms']<=102.

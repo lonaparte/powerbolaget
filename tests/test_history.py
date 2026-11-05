@@ -53,3 +53,24 @@ def test_minute_recording_is_opt_in_and_bounded():
         command(w,dict(kind='record',target=key))
     with pytest.raises(ValueError,match='8 objects'):
         w.archive.record(w,list(w.devices)[8],True)
+
+
+def test_exports_mark_intervals_held_after_numerical_failure():
+    w=World()
+    command(w,dict(kind='record',target='res_z01'))
+    w.advance(2)
+    w.archive.invalid(0.,1.)
+    data=export(w,'res_z01','minute')
+    assert data['invalid_intervals']==[[0.,1.]]
+    assert 'held after numerical failure' in as_csv(data)
+
+
+def test_unsafe_new_solver_settings_in_a_save_are_rejected():
+    from app.saves import validate,SaveError
+    w=World()
+    data=json.loads(json.dumps(w.state()))
+    data['grid']['branches']['f_z06']['id']='f_z06\nredirect bad'
+    with pytest.raises(SaveError):validate(data)
+    data=json.loads(json.dumps(w.state()))
+    data['grid']['branches']['f_z06']['active_fault']={'bus':'z06','r':'1\nredirect bad'}
+    with pytest.raises(SaveError):validate(data)

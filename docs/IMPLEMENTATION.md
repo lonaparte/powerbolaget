@@ -82,3 +82,9 @@ without a public source are assumptions and must be visible as such in the model
   commuting/contract-cost utility, legacy-save migration, and retired-asset cost/wake/site cleanup.
   Validation: all 58 Python checks and 5 browser workflows passed, including per-good and water
   stock identities after daily trading and settlement. Started a 30-day autonomous trace.
+- Batch 7: post-event source-reference persistence, explicit held-state quality intervals in
+  JSON/CSV and settlements, validation of solver-bound save fields, world-isolated wake-cache keys,
+  and whole-session timing histograms (2% quantile buckets) alongside the recent 2,000-solve window.
+  Validation: 12 affected protocol/save/dynamic tests passed; timing/wake regression checks below.
+  First autonomous 30-day trace: zero numerical failures, mean 211.5 ms CPU/simulated hour,
+  82.5 MiB peak RSS, 6,079.8 KiB JSON save. These are measurements on this environment, not targets.

@@ -32,11 +32,19 @@ class Archive:
         self.selected=s.get('selected',[])
         self.waveforms=deque(s.get('waveforms',[]),maxlen=8)
         self.day_acc=s.get('day_acc',{})
+        self.invalid_intervals=s.get('invalid_intervals',[])
 
     def state(self):
         return dict(kinds=self.kinds,hours={k:list(v) for k,v in self.hours.items()},
                     days={k:list(v) for k,v in self.days.items()},minutes={k:list(v) for k,v in self.minutes.items()},
-                    selected=self.selected,waveforms=list(self.waveforms),day_acc=self.day_acc)
+                    selected=self.selected,waveforms=list(self.waveforms),day_acc=self.day_acc,invalid_intervals=self.invalid_intervals)
+
+    def invalid(self,start,end):
+        if self.invalid_intervals and abs(self.invalid_intervals[-1][1]-start)<1e-8:
+            self.invalid_intervals[-1][1]=end
+        else:
+            self.invalid_intervals.append([start,end])
+            self.invalid_intervals=self.invalid_intervals[-1000:]
 
     def hour(self,key,kind,t,values):
         self.kinds[key]=kind
@@ -130,7 +138,8 @@ def export(world,key='global',resolution='hour',start=0,end=None,event_id=None):
     return dict(schema='powerbolaget.history/1',object=key,resolution=resolution,clock_unit='minute',
                 fields=[['t','minute']]+fields,rows=rows,
                 statistic='integrated energy; end-of-hour states' if resolution=='hour' else 'daily energy sums; mean hourly states' if resolution=='day' else 'end-of-minute snapshot',
-                retention=dict(hours=168,days=30,minutes=1440,events=8),recording=key in a.selected)
+                retention=dict(hours=168,days=30,minutes=1440,events=8),recording=key in a.selected,
+                invalid_intervals=[r for r in a.invalid_intervals if r[1]>=start and (end is None or r[0]<=end)])
 
 
 def as_csv(data):
@@ -143,6 +152,10 @@ def as_csv(data):
             for sample in e.get('samples',[]):
                 writer.writerow([e['id'],e['t']]+sample)
     else:
-        writer.writerow([f'{name} [{unit}]' for name,unit in data['fields']])
-        writer.writerows(data['rows'])
+        writer.writerow([f'{name} [{unit}]' for name,unit in data['fields']]+['quality'])
+        duration={'hour':60,'day':1440,'minute':1}[data['resolution']]
+        for row in data['rows']:
+            left=row[0]-1 if data['resolution']=='minute' else row[0]
+            suspect=any(a<left+duration and b>left for a,b in data.get('invalid_intervals',[]))
+            writer.writerow(row+['held after numerical failure' if suspect else 'valid'])
     return out.getvalue()

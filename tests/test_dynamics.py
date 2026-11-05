@@ -53,3 +53,12 @@ def test_save_in_middle_of_event_preserves_controllers_and_continues():
     assert restored.frequency_hz==pytest.approx(w.frequency_hz,abs=.02)
     assert restored.grid['storage']['bess1']['soc']==pytest.approx(w.grid['storage']['bess1']['soc'],abs=1e-4)
     assert restored.archive.waveforms[-1]['status']=='complete'
+
+
+def test_completed_event_reference_survives_a_later_save():
+    w=island_event()
+    w.advance(2)
+    assert 'bess1_gf' in w.grid['references']
+    b=World(state=json.loads(json.dumps(w.state())))
+    w.advance(2);b.advance(2)
+    assert b.flows['storage']['bess1']==pytest.approx(w.flows['storage']['bess1'],abs=.05)

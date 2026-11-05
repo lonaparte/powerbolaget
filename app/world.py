@@ -33,6 +33,7 @@ from . import protection as P
 from . import dynamics as D
 from . import materials as M
 from . import water as U
+from .metrics import Timing
 from .calendar import DAY, HOUR, is_rest_day, label, month_index, parts, stamp
 from .events import EventQueue
 from .ledger import Ledger
@@ -54,6 +55,7 @@ class World:
         self.messages=(state or {}).get('messages',{})
         self.rms=(state or {}).get('rms',{})
         self.frequency_hz=(state or {}).get('frequency_hz',50.)
+        self.physics_valid=(state or {}).get('physics_valid',True)
         if state is None:
             self._fresh(seed)
         else:
@@ -68,6 +70,7 @@ class World:
         self.entity_hist = {k:deque(v,maxlen=168) for k,v in (state or {}).get('entity_hist',{}).items()}
         self.settled_until=(state or {}).get('settled_until',self.history_hour[-1]['t']+60 if self.history_hour else 0)
         self.perf = dict(minutes=0, solve_ms=deque(maxlen=2000), step_ms=deque(maxlen=2000), failures=0)
+        self.perf.update(all_solve=Timing(),all_step=Timing())
         self.ferry_orders = []
         self.hvdc_setpoint = 0.
         self.consumer_orders, self.lodging_orders, self.food_orders, self.construction_orders = {}, {}, [], []
@@ -157,7 +160,8 @@ class World:
                     retail_version=self.retail_version, contracts=self.contracts, price_observations=self.price_observations,
                     archive=self.archive.state(),messages=self.messages,settled_until=self.settled_until,
                     entity_hist={k:list(v) for k,v in self.entity_hist.items()},rms=self.rms,frequency_hz=self.frequency_hz,
-                    water=self.water,material_baseline=self.material_baseline,conservation_history=self.conservation_history)
+                    water=self.water,material_baseline=self.material_baseline,conservation_history=self.conservation_history,
+                    physics_valid=self.physics_valid)
 
     @staticmethod
     def _blank_demo():
@@ -263,7 +267,9 @@ class World:
             self.integrate(float(m+1))
             self.minute = m+1
             self.perf['minutes'] += 1
-            self.perf['step_ms'].append((_time.perf_counter()-t0)*1000)
+            elapsed=(_time.perf_counter()-t0)*1000
+            self.perf['step_ms'].append(elapsed)
+            self.perf['all_step'].add(elapsed)
             if budget_s is not None and _time.perf_counter()-start > budget_s:
                 break
 
@@ -367,17 +373,23 @@ class World:
         try:
             res = self.network.solve(loads, gens)
         except Exception as exc:     # a numerical failure is not a blackout
+            self.physics_valid=False
             self.perf['failures'] += 1
             self.log('numerical', f'Power flow failed: {exc}', None)
             if D.active(self):
                 D.finish(self,'numerical_failure')
             return None
-        self.perf['solve_ms'].append((_time.perf_counter()-t0)*1000)
+        elapsed=(_time.perf_counter()-t0)*1000
+        self.perf['solve_ms'].append(elapsed)
+        self.perf['all_solve'].add(elapsed)
         if not res.converged:
+            self.physics_valid=False
             self.perf['failures'] += 1
             self.log('numerical', 'Power flow did not converge; the last valid state is kept (numerical, not physical).', None)
             if D.active(self):
                 D.finish(self,'numerical_failure')
+        else:
+            self.physics_valid=True
         return res
 
     def apply_solution(self, t, w, reqs, served, turb, st, res):
@@ -385,6 +397,8 @@ class World:
         if res is None or not res.converged:
             if self.flows is None:
                 self.flows = dict(t=t, link=0., losses=0., storage={}, loading={}, dev={}, turb={}, vm={})
+            self.messages['PhysicalResult']=message(self,'PhysicalResult',t,t,
+                dict(converged=False,quality='held_last_valid_solution',last_valid_time=self.flows['t']))
             return
         self.last_losses = res.losses_mw
         for did,(actual,q) in res.loads.items():
@@ -498,6 +512,8 @@ class World:
             self.t_now = max(self.t_now, t_to)
             return
         h = dt/60
+        if not self.physics_valid:
+            self.archive.invalid(t_from,t_to)
         f = self.flows
         acc = self.acc
         w = self.weather_now
@@ -998,6 +1014,7 @@ class World:
             sales=round(sales)))
         self.messages['EconomicSettlement']=message(self,'EconomicSettlement',start,end,
             dict(served_mwh=acc['load_srv'],requested_mwh=acc['load_req'],
+                 quality='estimated_during_numerical_failure' if any(a<end and b>start for a,b in self.archive.invalid_intervals) else 'validated',
                  payments_sek={k:v-before.get(k,0.) for k,v in led.totals.items() if v!=before.get(k,0.)}))
         self.settled_until=end
         self.acc = self._blank_acc()

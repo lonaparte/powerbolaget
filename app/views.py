@@ -80,7 +80,7 @@ def snapshot(world, since_log=0):
         totals=dict(load=r(load), requested=r(req), unserved=r(req-load), wind=r(wind), wind_avail=r(f.get('wind_avail', wind)),
                     link=r(f.get('link', 0.)), link_cap=r(N.link_capacity(world), 1), link_dc=r(f.get('link_dc', f.get('link', 0.))),
                     link_ac=r(f.get('link_ac', 0.)), cap_dc=r(N.hvdc_capacity(world), 1), cap_ac=r(N.hvac_capacity(world), 1),
-                    reference='AC mainland' if grid['source_bus'] == 'mainland_ac' else 'HVDC converter', battery=r(sum(storage.values())),
+                    reference=reference(world),quality='valid' if world.physics_valid else 'held after numerical failure',battery=r(sum(storage.values())),
                     frequency_hz=world.frequency_hz,oil=r(sum(f.get('oil',{}).values())), losses=r(f.get('losses', 0.)), price=r(world.energy_price(world.minute), 3),
                     tariff=r(world.tariff('household', world.minute), 3), energized=len(energized), buses=len(grid['buses'])),
         buses={b: [r(f.get('vm', {}).get(b, 0.), 4), r(f.get('va', {}).get(b, 0.), 2), b in energized] for b in grid['buses']},
@@ -103,6 +103,12 @@ def snapshot(world, since_log=0):
         perf=perf(world), grid_version=grid['version'], firm_count=len(world.firms),
         last_hour=hist[-1] if hist else None,
     )
+
+
+def reference(world):
+    if N.link_capacity(world)>0:
+        return 'AC mainland' if world.grid['source_bus']=='mainland_ac' else 'VSC-HVDC converter'
+    return ', '.join(u['name'] for u in G.forming_units(world.grid) if u.get('forming_active')) or 'de-energised island'
 
 
 def branch_state(world, bid, br, f):
@@ -136,7 +142,7 @@ def perf(world):
     pick = lambda xs, q: r(xs[min(len(xs)-1, int(q*len(xs)))], 2) if xs else None
     return dict(step_p50=pick(steps, .5), step_p95=pick(steps, .95), solve_p50=pick(solves, .5), solve_p95=pick(solves, .95),
                 ms_per_sim_hour=r(sum(steps)/len(steps)*60, 1) if steps else None, failures=world.perf['failures'],
-                minutes=world.perf['minutes'])
+                minutes=world.perf['minutes'],whole_session=dict(solve=world.perf['all_solve'].summary(),step=world.perf['all_step'].summary()))
 
 
 # ---------------------------------------------------------------- inspector
@@ -211,7 +217,7 @@ def entity(world, eid):
         cables = [dict(id=c, status=branch_state(world, c, grid['branches'][c], f)[3], loading=r(f.get('loading', {}).get(c, 0.), 3)) for c in ac['cables']]
         return dict(type='link', id='link', title='Mainland links', capacity=N.link_capacity(world), p=r(f.get('link', 0.)),
                     q=r(f.get('link_q', 0.)), margin=world.settings['link_margin'],
-                    reference='AC mainland grid' if grid['source_bus'] == 'mainland_ac' else 'HVDC converter',
+                    reference=reference(world),
                     hvdc=dict(poles=grid['link']['poles'], capacity=N.hvdc_capacity(world), p=r(f.get('link_dc', f.get('link', 0.)))),
                     hvac=dict(name=ac['name'], cables=cables, capacity=N.hvac_capacity(world), stage_mw=ac['capacity'], p=r(f.get('link_ac', 0.)),
                               stages=[], player_controlled=True, mainland_limit=440.))

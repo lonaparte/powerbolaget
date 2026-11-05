@@ -160,6 +160,11 @@ def finish(world,status='complete'):
         w['final_frequency_hz']=world.frequency_hz
         w['remaining_faults']=[k for k,b in world.grid['branches'].items() if b.get('active_fault')]
     world.rms['active']=False
+    if status=='complete':
+        for name,values in world.network.reference_overrides.items():
+            bus=world.grid['source_bus'] if name=='source' else sources(world).get(name,{}).get('bus')
+            if bus:
+                world.grid.setdefault('references',{})[name]=dict(bus=bus,values=list(values))
     world.network.reference_overrides={}
     if status=='numerical_failure':
         world.network.dirty=True

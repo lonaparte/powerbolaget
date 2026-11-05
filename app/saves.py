@@ -31,6 +31,11 @@ def validate(state):
         for k in items:
             if not ID.match(k):
                 raise SaveError(f'Invalid {key} id.')
+            if not isinstance(items[k],dict) or items[k].get('id')!=k:
+                raise SaveError(f'Mismatched {key} element id.')
+    for b in grid['buses'].values():
+        if b.get('kv') not in G.BASES_KV or not _num(b.get('x'),-100,250) or not _num(b.get('y'),-100,250):
+            raise SaveError('Invalid bus voltage or coordinates.')
     for k, br in grid['branches'].items():
         if br.get('a') not in grid['buses'] or br.get('b') not in grid['buses']:
             raise SaveError('A branch connects to an unknown bus.')
@@ -45,6 +50,11 @@ def validate(state):
                 raise SaveError('Invalid branch size.')
         if not _num(br.get('circuits', 1), 1, 20):
             raise SaveError('Invalid circuit count.')
+        if not _num(br.get('tap',1.),.9,1.1) or not _num(br.get('rating_factor',1.),.1,10):
+            raise SaveError('Invalid branch settings.')
+        fault=br.get('active_fault')
+        if fault is not None and (not isinstance(fault,dict) or fault.get('bus') not in grid['buses'] or not _num(fault.get('r'),.001,1e6)):
+            raise SaveError('Invalid active fault.')
     for t in grid['turbines'].values():
         if t.get('model') not in TURBINE_MODELS or t.get('bus_lv') not in grid['buses'] or t.get('bus_mv') not in grid['buses']:
             raise SaveError('Invalid turbine.')
@@ -64,8 +74,18 @@ def validate(state):
     if not isinstance(devices, dict) or len(devices) > LIMITS['devices']:
         raise SaveError('Invalid load devices.')
     for k, d in devices.items():
-        if not ID.match(k) or d.get('bus') not in grid['buses'] or not _num(d.get('pf'), .5, 1):
+        if not ID.match(k) or d.get('id')!=k or d.get('bus') not in grid['buses'] or not _num(d.get('pf'), .5, 1):
             raise SaveError('Invalid load device.')
+    for name,ref in grid.get('references',{}).items():
+        if not ID.match(name) or not isinstance(ref,dict) or ref.get('bus') not in grid['buses']:
+            raise SaveError('Invalid voltage reference.')
+        v=ref.get('values',[])
+        if len(v)!=3 or not _num(v[0],.05,1.2) or not _num(v[1],-1e9,1e9) or not _num(v[2],.001,1e8):
+            raise SaveError('Invalid voltage reference settings.')
+    for name,s in state.get('rms',{}).get('states',{}).items():
+        y=s.get('y',[])
+        if not ID.match(name) or len(y)!=4 or any(not _num(x,-1e9,1e9) for x in y) or not _num(s.get('factor'),1,50):
+            raise SaveError('Invalid RMS controller state.')
     for key in ('pops', 'firms'):
         if not isinstance(state.get(key), dict) or len(state[key]) > LIMITS[key]:
             raise SaveError(f'Invalid or oversized {key}.')

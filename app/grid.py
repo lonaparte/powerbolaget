@@ -164,6 +164,9 @@ class Network:
         for s in forming_units(self.grid):
             if s['grid_forming'] and s['status'] != 'construction' and s.get('forming_active'):
                 self.solver.set_enabled('vsource', s['id']+'_gf', True)
+        for name,ref in self.grid.get('references',{}).items():
+            if name!='source' or ref['bus']==self.grid['source_bus']:
+                self.solver.set_reference(name,*ref['values'])
         self.energized = energized(self.grid)
         self.dirty = False
 
