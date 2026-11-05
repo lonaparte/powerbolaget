@@ -46,6 +46,7 @@ The interface has a day and a night palette. It starts in **Day**; the three but
 ## What is simulated
 
 The implemented design and the 13 confirmed first-release decisions are documented in `docs/MODEL.md`.
+The requirement-by-requirement status and remaining acceptance blockers are in `docs/DESIGN-AUDIT.md`.
 
 - **World core.** One authoritative state, one event clock, a double-entry money ledger and independent random streams. Events have sub-minute timestamps. Hour, day and month boundaries settle the completed period before anyone plans the next.
 - **Island.** About 55,000 residents in 18 economic zones, using about 900 GWh of electricity a year with a peak near 180 MW, like Gotland. About 40 % of it goes to the cement works, sized like Gotland's Slite plant. Six wind farms with 158 MW cover about 45 % of the island's use, as on Gotland. Zones are dense where people are dense, with seven in and around the main town of Västerhamn (the Visby counterpart). The countryside forms large zones around small coastal towns and inland service villages.

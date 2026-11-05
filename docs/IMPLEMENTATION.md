@@ -27,7 +27,8 @@ Completion means executable behavior and validation, not just documentation or a
 - [x] Production labor/capacity, inventory conservation, elapsed-time protection and request deduplication.
 - [x] Contract-consistent planning, retail policy and bounded private finance/exit.
 - [x] Editable engineering, oil backup, player-controlled links and asset lifecycle.
-- [x] Aggregated electrical dynamics, P/Q limits and fault/protection/restoration behavior.
+- [x] Aggregated source dynamics, P/Q limits and fault/protection/restoration behavior.
+- [ ] Station/farm wind-converter RMS event dynamics and single/aggregate benchmark.
 - [x] Versioned module exchanges, persistent layered history and engineering exports.
 - [x] Client controls, layers, object analysis and event inspection.
 - [ ] Calibration, conservation/reference checks, sensitivity and scale measurements.
@@ -71,7 +72,7 @@ without a public source are assumptions and must be visible as such in the model
   Validation: existing 46 Python tests plus 3 new protection checks passed; browser results below.
 - Batch 5b: 20 ms RMS event clock; swing/virtual-swing, droop governor and voltage regulator
   coupled to native AC network solutions, balanced fault shunts, VSC virtual-impedance limiting,
-  farm frequency response, underfrequency shedding, timed voltage ride-through, actual-current
+  minute-level wind overfrequency curtailment, underfrequency shedding, timed voltage ride-through, actual-current
   relay integration and breaker delay. Saved control states, global/object waveforms, action chains,
   CSV/JSON and waveform inspector. Actual P/Q metering includes voltage dependence and fault heat.
   Rejected stale voltage timers and overly weak VSC filter impedance through regression testing.
@@ -92,8 +93,13 @@ without a public source are assumptions and must be visible as such in the model
   selection, active/reactive/loss grid layers, frequency/quality display and paged large POP tables;
   stable island load restoration; ageing for split POP cohorts; checksummed, size-limited compressed
   history in saves; resumable benchmarks and synthetic 10,000-POP/600-turbine scale fixtures.
-  Validation: all 68 Python checks and all 5 Chromium workflows passed. A filled-retention scale
+  Validation at that commit: all 68 Python checks and all 5 Chromium workflows passed. A filled-retention scale
   fixture reduced a 32.67 MB raw save to 9.22 MB, below the 12 MB request limit. The controlled
   10,000-POP/600-turbine case supplied all demand with no numerical failures at 2.48 s CPU/simulated
   hour and 97.3 MiB peak RSS. Server-paged POP tables render 100 rows at a time; the full grid view
-  measured 6.74 ms mean / 8.5 ms p95 at 60 FPS in headless Chromium. Annual acceptance remains active.
+  measured 6.74 ms mean / 8.5 ms p95 at 60 FPS in headless Chromium.
+- Acceptance refresh: all 69 Python checks and all 5 Chromium workflows passed. The corrected seed-1
+  autonomous year completed with 892.8 GWh demand, 401.8 GWh wind, 80.3 MWh unserved energy and zero
+  numerical failures. It also exposed a calibration blocker: ten regional service firms and one food
+  processor exited, leaving 7,688 unemployed after the year boundary. Annual electrical, conservation,
+  sensitivity and scale evidence is recorded; wind dynamics and annual economic calibration remain open.

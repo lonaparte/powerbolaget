@@ -157,8 +157,39 @@ A 20 MW / 80 MWh grid-forming battery is 326.6 MSEK and 240 days under declared 
 
 ## Autonomous year
 
-The current 365-day seed-1 run is checkpointed every ten days. This section will be replaced with its
-complete measured result before the final acceptance commit.
+`results/acceptance-365d.json` is the corrected seed-1 no-player run from core commit `ef3afcb` plus
+the documentation/evidence commit `a02bc72`. It starts from a new world, checkpoints every ten days and
+finishes all 525,600 regular minute intervals after the persistent-fault protection fix.
+
+| Annual result | Measured value |
+|---|---:|
+| Requested electricity | 892.815 GWh |
+| Peak demand | 182.05 MW |
+| Wind generation | 401.752 GWh (45.0% of requested electricity) |
+| Mainland import / export | 552.375 / 29.576 GWh |
+| Unserved electricity | 80.289 MWh (0.0090%) |
+| Numerical failures | 0 |
+| Population, opening / post-year boundary | 55,300 / 54,540 |
+| Tourist arrivals / turned away | 631,033 / 130,189 |
+| Firms, operating / constructing / exited | 58 / 1 / 11 |
+| Unemployed people after the year boundary | 7,688 |
+| PB cash, opening / closing | 400.0 / 707.1 MSEK |
+
+The demand, 182 MW peak and 45% wind share meet the declared macro comparison of 850–1,000 GWh,
+about 180 MW and roughly 45%. The population identity closes exactly: 55,300 + 512 births - 640 deaths
++ 1,140 immigrants - 1,772 emigrants = 54,540. Goods and water residuals remain below 6.22×10⁻⁷ in
+their own units and 1.81×10⁻⁷ m³ respectively; the post-boundary money sum is -0.000275 SEK.
+
+The electrical/numerical year passes, but the autonomous economy does not yet pass macro calibration.
+Ten of eighteen regional service firms and the slaughterhouse exit in the final quarter, after aggregate
+private debt peaks at 514.4 MSEK. Debt falls to 9.5 MSEK only because exit settles it as creditor loss;
+unemployment then reaches 7,688. This is a systematic service-price/staffing calibration signal, not
+evidence of a healthy equilibrium. It keeps the final calibration item open.
+
+Recorded CPU time totalled 2,237.8 s (37.3 minutes), averaging 255.5 ms per simulated hour
+(330.9 ms p95). The final process resumed after day 180 and took 1,171.4 s wall time; wall time for the
+two processes together was not retained. Across 282,103 power flows, solve time averaged 2.221 ms with
+1.978/3.583 ms p50/p95; peak RSS was 189.0 MiB and the final save was 4.49 MiB.
 
 ## Findings fixed during acceptance
 
@@ -170,8 +201,7 @@ branch while checking loss and source balance.
 The first current-model annual attempt exposed a statistics boundary: an island could have an energised
 set while every reported voltage was at or below the 0.2 pu display filter, leaving `min()` with an empty
 sequence. Voltage minimum now records 0 pu for that physical collapse. A direct regression reproduces
-the empty-filter condition; the checkpointed year run verifies progress beyond the original day-250
-failure before its result is accepted.
+the empty-filter condition; the corrected year completes beyond the original day-250 failure.
 
 That rerun then exposed the reason for the low-voltage state. A severe `l_kal_rom` fault selected the
 HVDC upstream overcurrent backup in the prospective study, but converter current limiting kept measured
@@ -179,8 +209,8 @@ current below pickup after voltage collapsed. Correctly, the overcurrent integra
 the prospective value; incorrectly, no independent line protection cleared the persistent fault. The
 model now includes a separately labelled five-second sustained-undervoltage fault backup as a proxy for
 the omitted distance/differential layer. The regression recreates the exact HVDC-backup selection and
-verifies fault isolation from actual voltage with zero numerical failures. The annual acceptance run is
-repeated from day 0 after this fix.
+verifies fault isolation from actual voltage with zero numerical failures. The annual acceptance run was
+repeated from day 0 after this fix and completed without recurrence.
 
 Early scale-fixture trials also clarified that simply cloning 2 km collector cables and voltage-droop
 converters creates a different 2.1 GW electrical design with cable charging and overvoltage trips. The

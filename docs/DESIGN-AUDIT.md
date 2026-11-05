@@ -6,8 +6,9 @@ This audit compares the implemented first release with
 complete merely because a UI control or data field exists.
 
 Status date: 5 November 2026. Core source under review: `ef3afcb`; `a02bc72` refreshes only acceptance
-evidence. The corrected autonomous-year run is still in progress, so this is an implementation audit,
-not final release acceptance.
+evidence. The corrected autonomous-year run has completed. It validates the annual electrical/numerical
+path and exposes an economic calibration blocker, so this remains an implementation audit rather than
+final release acceptance.
 
 ## Overall finding
 
@@ -36,7 +37,7 @@ fictional economy or turn assumed parameters into Gotland measurements.
 | Multi-rate time model | Complete | Grid operation is sampled each minute, important electrical events use 20 ms steps, and social/economic processes use hourly/daily/monthly boundaries. |
 | Individually connected and inspectable wind turbines | Partial | All 54 opening turbines have individual buses, transformers/collectors, weather, P/Q, fault and maintenance state. During a 20 ms event, however, wind remains a static network injection. There is no wind-farm dynamic state or single-turbine-versus-aggregate dynamic benchmark. |
 | Continuous minute demand with real discrete events | Complete for the implemented load types | Hourly targets ramp continuously; motors, trips and protection retain discrete timing. Requested and served energy are integrated separately. |
-| Measure performance before setting a speed target | Partial evidence | CPU, solve latency, memory, save size and browser FPS are measured at four scales. The corrected 365-day run is not yet complete. A full-limit fixture costs 2.39 CPU seconds per simulated hour, so high game speeds at that synthetic maximum remain limited on one core. |
+| Measure performance before setting a speed target | Complete measurement; optimisation remains optional | CPU, solve latency, memory, save size and browser FPS are measured at four scales, and the corrected 365-day opening-world run completed. A full-limit fixture costs 2.39 CPU seconds per simulated hour, so high game speeds at that synthetic maximum remain limited on one core. |
 | Three views with layers, inspector and pinned objects | Functionally complete; UX validation open | Island, grid and socioeconomic views, shared selection, map layers, inspection, pins and exports work in Chromium. Metric-level formula/source drill-down and classroom usability testing are missing. |
 | Free PB investment, explicit finance, simple contracts/tariffs and automatic operation | Complete at first-release depth | PB shortfalls are explicit external financing; private firms use finite credit and may exit. Signed contracts, retail policy, mainland settlement and automatic dispatch exist. This is intentionally not a nodal market. |
 
@@ -49,8 +50,8 @@ the web client, layered history/export and editable new retail contracts.
 
 Decision 1 is only half complete. Individual steady-state turbine connections are implemented, while
 station/farm aggregated event dynamics are not. Decision 13 is also partial: physical references,
-conservation, declared assumptions, scale and local sensitivity exist, but the corrected autonomous
-year, annual macro calibration, parameter interactions and student usability evidence do not.
+conservation, declared assumptions, scale, local sensitivity and a corrected autonomous year exist, but
+annual economic calibration, parameter interactions and student usability evidence do not.
 
 ## Milestone assessment
 
@@ -93,11 +94,12 @@ trade, contracts, credit/exit, tourism, births/deaths/migration, construction de
 loads. Outages trip equipment and affect production; contracts affect scheduling; firms can shrink,
 expand or exit; population and employment feed future demand.
 
-The opening economy has not yet passed an annual calibration target. In the corrected no-player run,
-several regional service firms are accumulating debt and one firm has exited by mid-year. This may be
-a valid scenario outcome or a coefficient imbalance; only the completed year and comparison against
-declared ranges can decide. Existing sensitivity covers three winter days one factor at a time, so it
-does not establish annual macroeconomic stability or causal response across multiple seeds.
+The opening economy has not passed annual calibration. The corrected no-player year ends with ten of
+eighteen regional service firms and the slaughterhouse exited, 7,688 people unemployed and creditor
+losses after aggregate private debt peaked at 514.4 MSEK. This systematic service-price/staffing outcome
+is a blocker, even though the credit and exit mechanisms behaved as designed. Existing sensitivity covers
+three winter days one factor at a time, so it does not establish annual macroeconomic stability or causal
+response across multiple seeds.
 
 ### M3 — full opening world and three views: partial acceptance
 
@@ -107,8 +109,7 @@ paths and full-scale rendering.
 
 The original acceptance still lacks:
 
-- a completed corrected 365-day run with annual energy, population, firm, debt, outage and numerical
-  drift review;
+- correction and rerun of the annual service-sector collapse exposed by the completed 365-day review;
 - direct user testing with KTH students or engineers;
 - third-level explanation for important metrics: composition, formula, source/assumption and linked
   objects are not consistently available from the metric itself;
@@ -120,9 +121,9 @@ The original acceptance still lacks:
 1. Implement real farm-level RMS states and response, then add the single/aggregate wind dynamic
    comparison required by M1. Correct the documentation so it does not call static wind injection a
    completed farm dynamic model.
-2. Finish and inspect the corrected autonomous year. Set explicit acceptable ranges for annual energy,
-   peak/seasonality, population, employment, firm exits/debt and conservation residuals; tune only with
-   declared assumptions and rerun the affected sensitivities.
+2. Correct the systematic service-sector price/staffing imbalance exposed by the autonomous year. Keep
+   the already credible 892.8 GWh demand, 182.05 MW peak and 45.0% wind share within declared ranges,
+   then rerun the annual and affected sensitivity cases.
 3. Give each observed, assumed and fictional parameter a structured provenance record and expose the
    source/formula/decomposition from the relevant UI metric.
 4. Add end-to-end scenario evidence that contract price and outage history change firm decisions and

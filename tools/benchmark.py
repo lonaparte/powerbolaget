@@ -21,6 +21,7 @@ from app import __version__  # noqa: E402
 from app.calendar import label  # noqa: E402
 from app.saves import validate  # noqa: E402
 from app.world import World  # noqa: E402
+from app import society as S  # noqa: E402
 
 
 def write_checkpoint(path,w,days):
@@ -54,6 +55,7 @@ def main():
             raise ValueError('Benchmark progress does not match the world checkpoint.')
     else:
         w=World(seed=a.seed);days=[]
+    resume_from_day=len(days)
     for d in range(len(days),a.days):
         c0 = time.process_time()
         w.advance(1441 if w.minute == 0 else 1440)   # the day is settled at the next midnight
@@ -78,17 +80,36 @@ def main():
             write_checkpoint(a.checkpoint,w,days)
     solves = sorted(w.perf['solve_ms'])
     q = lambda xs, f: round(xs[min(len(xs)-1, int(f*len(xs)))], 3) if xs else None
+    # A run can finish on a month/year boundary. The last closed day's history then correctly describes
+    # the population during that day, while monthly demography has already changed the new day's state.
+    # Record both the daily series and an explicit post-boundary final state so acceptance reports do not
+    # mistake the former for the latter.
+    S.refresh_stats(w)
+    final_check=w.conservation_history[-1] if w.conservation_history else {}
+    final_state=dict(
+        minute=w.minute,residents=S.residents(w),tourists=sum(w.society_stats['zone_tourists'].values()),
+        unemployed=sum(w.society_stats['zone_unemployed'].values()),pb_cash=round(w.ledger.balance('pb'),3),
+        firms=len(w.firms),active_firms=sum(f['status']=='operating' for f in w.firms.values()),
+        constructing_firms=sum(f['status']=='construction' for f in w.firms.values()),
+        exited_firms=sum(f['status']=='exited' for f in w.firms.values()),
+        private_debt_sek=sum(f.get('credit',{}).get('debt',0.) for f in w.firms.values()),
+        money_sum=round(sum(w.ledger.accounts.values()),6),
+        max_goods_residual=max((abs(v['residual']) for v in final_check.get('goods',{}).values()),default=0.),
+        max_water_residual=max((abs(v) for v in final_check.get('water',{}).values()),default=0.))
     report = dict(
         git_commit=source_commit,
         processor_model=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name')),platform.machine()),
         version=__version__, seed=w.seed, days=a.days, python=platform.python_version(), machine=platform.machine(),
         processor=platform.processor() or platform.machine(), wall_s=round(time.perf_counter()-t0, 1),
+        wall_scope=('current process, resumed after day '+str(resume_from_day)) if a.resume else 'whole run',
+        cpu_total_s=round(sum(x['cpu_s'] for x in days),3),
         ms_per_sim_hour=dict(mean=round(statistics.mean(x['ms_per_sim_hour'] for x in days), 1),
                              p95=q(sorted(x['ms_per_sim_hour'] for x in days), .95)),
         power_flow_ms=w.perf['all_solve'].summary(),recent_power_flow_ms=dict(p50=q(solves,.5),p95=q(solves,.95),samples=len(solves),scope='last 2000 solves'),numerical_failures=w.perf['failures'],
         peak_rss_mb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024, 1),
         save_kb=round(len(json.dumps(w.state()))/1024, 1), log_tail=[e['label']+' '+e['text'] for e in list(w.logbook)[-25:]],
         demography=w.demography['months'], days_detail=days,energy_gwh=sum(d['load_mwh'] for d in days)/1000,
+        final_state=final_state,
         final_firms=[dict(id=f['id'],kind=f['kind'],status=f['status'],staff=f['staff'],margin=f['ema_margin'],
                          cash=w.ledger.balance('firm:'+f['id']),credit=f.get('credit')) for f in w.firms.values()])
     print(json.dumps({k: v for k, v in report.items() if k not in ('days_detail', 'demography', 'log_tail','final_firms')}, indent=1))
