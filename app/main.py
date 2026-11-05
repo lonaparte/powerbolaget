@@ -113,6 +113,7 @@ class Build(BaseModel):
 
 class Command(BaseModel):
     model_config = ConfigDict(extra='forbid')
+    request_id: Optional[str] = Field(default=None, min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
     kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings']
     build: Optional[Build] = None
     target: Optional[str] = Field(default=None, pattern=ID)

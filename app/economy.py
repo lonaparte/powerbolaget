@@ -216,6 +216,10 @@ def plan_hour(world, now):
             key = did[len(f['id'])+1:]
             if key in want:
                 d = world.devices[did]
+                # Unstaffed production must not start. Cold storage and essential services may
+                # remain powered; intermediate labor shortages reduce actual throughput below.
+                if d.get('rate', 0) > 0 and labor_fraction(f) == 0:
+                    want[key] = False
                 if d['want_on'] != want[key]:
                     world.events.push(now+(i*7) % 23, 'equipment', 'equipment', device=did, on=want[key])
 
@@ -244,9 +248,11 @@ def settle_hour(world, start, end):
             continue
         kind = f['kind']
         run = {}
+        labor = labor_fraction(f)
+        capacity = f.get('capacity_factor', 1.)
         for did in f['equipment']:
             d = world.devices[did]
-            run[did[len(f['id'])+1:]] = d['run_min']/60
+            run[did[len(f['id'])+1:]] = d['run_min']/60*labor*capacity
             if d['run_min'] < 59.9 and d['want_on']:
                 f['today']['outage_min'] += 60-d['run_min'] if d['state'] in ('tripped', 'warmup') else 0
             d['run_min'] = 0.
@@ -257,8 +263,6 @@ def settle_hour(world, start, end):
             if run['aux'] > .5:
                 produce(f, 'clinker', run['kiln']*R['kiln'], RECIPE['clinker'])
             produce(f, 'cement', run['cmill1']*R['cmill1']+run['cmill2']*R['cmill2'], RECIPE['cement'], output=True)
-            for k, lim in f['limits'].items():
-                inv[k] = min(inv[k], lim)
         elif kind == 'quarry':
             produce(f, 'limestone', min(run['crusher1'], run['crusher2'])*QUARRY_RATE[f['id']], {}, output=True)
         elif kind == 'dairy':
@@ -292,8 +296,13 @@ def settle_hour(world, start, end):
 
 
 def produce(f, good, amount, recipe, output=False):
-    """Make up to `amount` of good, limited by input stocks."""
+    """Make up to `amount`, limited by inputs, labor (at caller) and output storage.
+
+    The material account records physical creation and recipe consumption separately from money.
+    A full silo stops production before ingredients are consumed; stock is never silently clipped.
+    """
     inv = f['inventory']
+    amount = min(amount, max(0., f.get('limits', {}).get(good, float('inf'))-inv.get(good, 0.)))
     if amount <= 0:
         return 0.
     for g, per in recipe.items():
@@ -301,10 +310,19 @@ def produce(f, good, amount, recipe, output=False):
             amount = min(amount, inv.get(g, 0.)/per)
     for g, per in recipe.items():
         inv[g] = inv.get(g, 0.)-amount*per
+        f.setdefault('materials', {}).setdefault('consumed', {}).setdefault(g, 0.)
+        f['materials']['consumed'][g] += amount*per
     inv[good] = inv.get(good, 0.)+amount
+    produced = f.setdefault('materials', {}).setdefault('produced', {})
+    produced[good] = produced.get(good, 0.)+amount
     if output:
         f['today']['produced'] += amount
     return amount
+
+
+def labor_fraction(f):
+    """Available staff relative to the staffing required by the installed plant (assumption)."""
+    return min(1., max(0., f['staff']/max(1, f['desired_staff'])))
 
 
 def staff_presence(f, minute):

@@ -13,6 +13,8 @@ Modules own their data (society: POPs; economy: firms; load engine: devices; ene
 tools that read a snapshot and return results.
 """
 import time as _time
+import hashlib
+import json
 from collections import deque
 from math import sqrt
 from . import construction as C
@@ -53,6 +55,7 @@ class World:
         self.ferry_orders = []
         self.hvdc_setpoint = 0.
         self.consumer_orders, self.lodging_orders, self.food_orders, self.construction_orders = {}, {}, [], []
+        self.command_receipts = (state or {}).get('command_receipts', {})
 
     # ------------------------------------------------------------ creation and saves
     def _fresh(self, seed):
@@ -116,7 +119,8 @@ class World:
                     history_hour=list(self.history_hour), history_day=self.history_day, logbook=list(self.logbook),
                     outage={k: list(v) for k, v in self.outage.items()}, commands=self.commands, acc=self.acc,
                     price_avg=self.price_avg, contract_price=self.contract_price, last_losses=self.last_losses,
-                    construction_backlog=self.construction_backlog, outage_today=self.outage_today)
+                    construction_backlog=self.construction_backlog, outage_today=self.outage_today,
+                    command_receipts=self.command_receipts)
 
     @staticmethod
     def _blank_demo():
@@ -919,6 +923,14 @@ class CommandError(ValueError):
 def command(world, cmd):
     """Apply one player command at the current minute. Returns a short confirmation.
     The player directs Powerbolaget's own assets only; firms and residents decide for themselves."""
+    request_id = cmd.get('request_id')
+    fingerprint = hashlib.sha256(json.dumps({k: v for k, v in cmd.items() if k != 'request_id'},
+                                            sort_keys=True, allow_nan=False).encode()).hexdigest()
+    if request_id in world.command_receipts:
+        receipt = world.command_receipts[request_id]
+        if receipt['fingerprint'] != fingerprint:
+            raise CommandError('This request ID was already used for a different command.')
+        return receipt['result']
     kind = cmd['kind']
     t = float(world.minute)
     if kind == 'build':
@@ -978,6 +990,8 @@ def command(world, cmd):
         raise CommandError('Unknown command.')
     world.commands.append(dict(minute=world.minute, **cmd))
     world.commands = world.commands[-2000:]
+    if request_id:
+        world.command_receipts[request_id] = dict(fingerprint=fingerprint, result=result, minute=world.minute)
     return result
 
 

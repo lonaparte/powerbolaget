@@ -359,14 +359,17 @@ def overload_check(world, t, loading):
     trips = []
     for bid, x in loading.items():
         br = world.grid['branches'][bid]
+        previous = br.get('stress_t', t)
+        dt = max(0., t-previous)  # minutes, including fractional event timestamps
+        br['stress_t'] = max(t, previous)
         if not G.in_service(br) or br['a'] not in world.network.energized:
             br['stress'] = 0.
             continue
         stress = br.get('stress', 0.)
         if x > 1.0:
-            stress += (x-1.0)**1.5*4
+            stress += (x-1.0)**1.5*4*dt
         else:
-            stress = max(0., stress-.05)
+            stress = max(0., stress-.05*dt)
         br['stress'] = stress
         if stress >= 1.0 and G.in_service(br):
             trips.append(bid)

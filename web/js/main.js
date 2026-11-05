@@ -44,6 +44,7 @@
     setTimeout(loop, Math.max(40, TICK_SECONDS * 1000 - (performance.now() - t0)));
   }
   PB.command = async cmd => {
+    cmd = {request_id: crypto.randomUUID(), ...cmd};
     try {
       const j = await PB.call('/command', {command: cmd, since_log: PB.sinceLog});
       if (j.static) { PB.static = j.static; PB.emit('static'); }

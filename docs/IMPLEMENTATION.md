@@ -1,0 +1,48 @@
+# Agreed first-release scope and implementation record
+
+This record implements the decisions confirmed by the owner after the v0.2 audit.
+The source specification is a design input; the decisions below take precedence.
+
+## Accepted decisions
+
+1. Individual turbine steady-state connections; station/farm aggregated RMS event dynamics.
+2. Synthetic grid-forming VSC-HVDC; mainland AC reference after HVAC commissioning.
+3. Automatic attempted islanding, limited by forming capacity, SOC and protection.
+4. Suggested engineering with editable buses, types, routes and station locations.
+5. Player-led mainland interconnector construction and expansion, with explicit constraints.
+6. Wind and backup oil generators are the first-release generation catalogue.
+7. Firms respond to the marginal price in their own actual electricity contract.
+8. Finite private credit, interest, repayment and exit; PB investment financing remains explicit.
+9. Activity/device-driven demand; forecasts are separate from delivered energy integration.
+10. Existing HTML/JavaScript client and independent headless simulation core.
+11. Hour/day summaries, selected minute history, event waveforms/action chains and CSV/JSON export.
+12. Editable retail policy and new contracts; existing contracts honored; autonomous selection.
+13. Physical verification, macro calibration, explicit assumptions and sensitivity analysis.
+
+## Delivery batches
+
+Each batch is checked and committed separately on `codex/development` and pushed to origin.
+Completion means executable behavior and validation, not just documentation or a UI placeholder.
+
+- [ ] Production labor/capacity, inventory conservation, elapsed-time protection and request deduplication.
+- [ ] Contract-consistent planning, retail policy and bounded private finance/exit.
+- [ ] Editable engineering, oil backup, player-controlled links and asset lifecycle.
+- [ ] Aggregated electrical dynamics, P/Q limits and fault/protection/restoration behavior.
+- [ ] Versioned module exchanges, persistent layered history and engineering exports.
+- [ ] Client controls, layers, object analysis and event inspection.
+- [ ] Calibration, conservation/reference checks, sensitivity and scale measurements.
+
+## Validation policy
+
+Keep numerical failures distinct from physical blackouts. Do not describe invented response curves
+or steady-state switching as validated RMS dynamics. Preserve old saves with explicit defaults where
+possible. Record measured performance rather than promising an unmeasured speedup. Coefficients
+without a public source are assumptions and must be visible as such in the model documentation.
+
+## Work log
+
+- Baseline: `bb2ab18`, 26 Python checks passed. Browser checks: 3 passed and one failed due to
+  the missing favicon. Audit artifacts: `/workspace/powerbolaget-audit-v02/`.
+- Batch 1: labor/capacity-limited industrial throughput, storage-limited recipe production with
+  material counters, elapsed-time overload protection, persisted command receipts/client request IDs,
+  and favicon. Validation: 30 Python tests and all 4 Chromium game workflows passed.
