@@ -111,6 +111,10 @@ class World:
         self.retail_version = s.get('retail_version', 1)
         self.contracts = s.get('contracts', {})
         self.price_observations = s.get('price_observations', dict(sum=0., hours=0))
+        self.events.cancel(lambda e: e['kind'] == 'interconnector')
+        legacy = self.projects.get('tso_hvac')
+        if legacy and legacy['status'] == 'building':
+            legacy['status'] = 'cancelled'
         self.logbook = deque(s['logbook'], maxlen=400)
         self.outage = {k: deque(v, maxlen=120) for k, v in s['outage'].items()}
         self.zone_by_id = {z['id']: z for z in self.zones}
@@ -972,6 +976,8 @@ def command(world, cmd):
         br = world.grid['branches'].get(cmd['target'])
         if not br or br['id'] == 'hvdc':
             raise CommandError('Unknown or non-switchable branch.')
+        if br.get('retired') or any(p['status']=='building' and p.get('target')==br['id'] for p in world.projects.values()):
+            raise CommandError('This branch is retired or locked out for work.')
         br['closed'] = bool(cmd['closed'])
         world.network.switch(br['id'])
         world.grid_lost_turbines(t)
@@ -1005,6 +1011,22 @@ def command(world, cmd):
             raise CommandError(str(exc))
         result = f"New {cmd['category']} contract offers updated; signed contracts keep their terms"
         world.log('finance', result, None)
+    elif kind == 'asset_work':
+        from . import engineering as X
+        try:
+            plan = X.plan_asset(world, cmd['target'], cmd['action'])
+            C.start(world, plan)
+        except C.BuildError as exc:
+            raise CommandError(str(exc))
+        result = plan['title']+' started'
+    elif kind == 'cancel_project':
+        from . import engineering as X
+        try:
+            p = X.cancel_project(world, cmd['target'])
+        except C.BuildError as exc:
+            raise CommandError(str(exc))
+        result = 'Cancelled: '+p['title']+'; payments already made remain project costs'
+        world.log('construction', result, p['zone'], project=p['id'])
     else:
         raise CommandError('Unknown command.')
     world.commands.append(dict(minute=world.minute, **cmd))
@@ -1015,13 +1037,22 @@ def command(world, cmd):
 
 
 def plan_build(world, b):
+    from . import engineering as X
     typ = b.pop('type')
+    required = dict(turbine=('model','x','y'), storage=('p_mw','hours'), line=('a','b'),
+                    transformer=('station',), station=('x','y'), interconnector=('technology','p_mw','station'))
+    if any(b.get(k) is None for k in required.get(typ, ())):
+        raise C.BuildError('Complete the required fields for this project.')
     if typ == 'turbine':
-        return C.plan_turbine(world, b['model'], float(b['x']), float(b['y']))
+        return C.plan_turbine(world, b['model'], float(b['x']), float(b['y']), b.get('connect_bus'), b.get('route'))
     if typ == 'storage':
-        return C.plan_storage(world, b['station'], float(b['p_mw']), float(b['hours']), bool(b.get('grid_forming')))
+        return C.plan_storage(world, b.get('station'), float(b['p_mw']), float(b['hours']), bool(b.get('grid_forming')), b.get('connect_bus'))
     if typ == 'line':
-        return C.plan_line(world, b['a'], b['b'], b.get('line_type', 'OHL110'))
+        return X.plan_line(world, b['a'], b['b'], b.get('line_type', 'OHL110'), b.get('route'))
     if typ == 'transformer':
-        return C.plan_transformer(world, b['station'])
+        return X.plan_transformer(world, b['station'], b.get('mva', 40.))
+    if typ == 'station':
+        return X.plan_station(world, b['x'], b['y'], b.get('mv_kv', 20.), b.get('mva', 40.), b.get('name'))
+    if typ == 'interconnector':
+        return X.plan_link(world, b['technology'], b['p_mw'], b['station'], b.get('route'))
     raise C.BuildError('Unknown project type.')

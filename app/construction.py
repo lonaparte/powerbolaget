@@ -28,7 +28,7 @@ def winter_factor(minute):
     return 1.25 if doy < 75 or doy > 320 else 1.0
 
 
-def plan_turbine(world, model, x, y):
+def plan_turbine(world, model, x, y, connect_bus=None, route=None):
     if model not in TURBINE_MODELS:
         raise BuildError('Unknown turbine model.')
     m = TURBINE_MODELS[model]
@@ -55,7 +55,18 @@ def plan_turbine(world, model, x, y):
     cost = m['capex']
     days = m['days']
     plan = dict(kind='turbine', model=model, x=round(x, 3), y=round(y, 3), mw=m['mw'])
-    if best:
+    if connect_bus:
+        from . import engineering as X
+        connect_bus = X.bus(world, connect_bus, 'mv_bus')
+        if grid['buses'][connect_bus]['kv'] != 33.:
+            raise BuildError('Turbines connect to a 33 kV collector bus.')
+        path, km = X.route(world, connect_bus, [x, y], route)
+        fid = next((fid for fid, f in grid['farms'].items() if connect_bus == f['hub'] or any(
+            grid['turbines'][tid]['bus_mv'] == connect_bus for tid in f['turbines'])), 'wf_'+connect_bus)
+        cost += km*COST['collector_km']
+        plan.update(farm=fid, connect_bus=connect_bus, cable_km=km, route=path,
+                    connection=f'Player-selected 33 kV bus {connect_bus}, {km:.2f} km collector cable')
+    elif best:
         fid, bus, d = best
         km = round(max(.3, d*1.1), 2)
         cost += km*COST['collector_km']
@@ -74,15 +85,21 @@ def plan_turbine(world, model, x, y):
     return plan
 
 
-def plan_storage(world, station, p_mw, hours, grid_forming):
-    if station not in world.substations:
+def plan_storage(world, station, p_mw, hours, grid_forming, connect_bus=None):
+    if station not in world.substations and not connect_bus:
         raise BuildError('Unknown substation.')
     if not (1 <= p_mw <= 100) or not (.5 <= hours <= 8):
         raise BuildError('Battery size must be 1-100 MW and 0.5-8 hours.')
     e = p_mw*hours
     cost = (p_mw*COST['storage_mw']+e*COST['storage_mwh'])*(1+(COST['grid_forming_extra'] if grid_forming else 0))
-    sub = world.substations[station]
+    from . import engineering as X
+    bid = X.bus(world, connect_bus or station, 'mv_bus')
+    node = world.grid['buses'][bid]
+    if node['kv'] not in (20., 33.):
+        raise BuildError('Battery bays must connect at 20 or 33 kV.')
+    sub = world.substations.get(station, dict(name=node['name'], x=node['x'], y=node['y']))
     return dict(kind='storage', station=station, p_mw=p_mw, e_mwh=e, grid_forming=bool(grid_forming),
+                connect_bus=bid,
                 cost=round(cost*1e6), days=DAYS['storage'], zone=zone_at(sub['x'], sub['y'], world.zones)['id'],
                 title=f"{p_mw:g} MW / {e:g} MWh {'grid-forming ' if grid_forming else ''}battery at {sub['name']}",
                 connection=f"20 kV bay at {sub['name']}")
@@ -122,6 +139,12 @@ def start(world, plan):
     world.projects[pid] = project
     if plan['kind'] == 'turbine':
         add_turbine(world, plan, status='construction', project=pid)
+    if plan['kind'] == 'asset_work':
+        from . import engineering as X
+        target = plan['target']
+        asset = world.grid['branches'].get(target) or world.grid['turbines'].get(target) or world.grid['storage'].get(target)
+        project['before_work'] = {k:asset[k] for k in ('status','closed') if k in asset}
+        X.isolate(world, target)
     world.events.push(project['finish'], 'commission', 'commission', project=pid)
     world.log('construction', f"Construction started: {plan['title']} ({plan['days']} days, {plan['cost']/1e6:.0f} MSEK)",
               plan['zone'], project=pid)
@@ -158,15 +181,21 @@ def commission(world, pid):
     elif kind == 'storage':
         add_storage(world, p)
     elif kind == 'line':
-        sa, sb = world.substations[p['a']], world.substations[p['b']]
-        bid = f"l_{p['a']}_{p['b']}_{pid}".lower()
-        G.add_line(grid, bid, sa['hv_bus'], sb['hv_bus'], p['type'], km=p['km'], name=f"{sa['name']}–{sb['name']}")
+        a = p.get('a_bus') or world.substations[p['a']]['hv_bus']
+        b = p.get('b_bus') or world.substations[p['b']]['hv_bus']
+        bid = f'l_{pid}'
+        G.add_line(grid, bid, a, b, p['type'], km=p['km'], name=p['title'], route=p.get('route'))
+        p['asset'] = bid
     elif kind == 'transformer':
         sub = world.substations[p['station']]
         n = len(sub['transformers'])+1
         bid = f"t_{p['station']}_{n}".lower()
-        G.add_transformer(grid, bid, sub['hv_bus'], sub['mv_bus'], '110/20', 40., name=f"{sub['name']} T{n}")
+        G.add_transformer(grid, bid, sub['hv_bus'], sub['mv_bus'], p.get('transformer_type', '110/20'),
+                          p.get('mva', 40.), name=f"{sub['name']} T{n}")
         sub['transformers'].append(bid)
+    elif kind in ('station', 'interconnector', 'asset_work'):
+        from . import engineering as X
+        X.commission(world, p)
     grid['version'] = grid.get('version', 0)+1
     if getattr(world, 'network', None):
         world.network.dirty = True
@@ -180,6 +209,9 @@ def add_turbine(world, plan, status='ok', project=None, tid=None, age=0.):
     tid = tid or f'wt{n:03d}'
     x, y = plan['x'], plan['y']
     farm_id = plan.get('farm')
+    if farm_id is not None and farm_id not in grid['farms']:
+        grid['farms'][farm_id] = dict(id=farm_id, name='Collector '+plan['connect_bus'], hub=plan['connect_bus'],
+                                     substation=None, turbines=[])
     if farm_id is None:
         farm_id = f'wf{world.next_id("farm")}'
         sub = world.substations[plan['substation']]
@@ -193,7 +225,7 @@ def add_turbine(world, plan, status='ok', project=None, tid=None, age=0.):
         plan['farm'] = farm_id
     mv = G.add_bus(grid, f'{tid}_mv', f'{tid.upper()} 33 kV', 33., x, y, 'turbine')
     lv = G.add_bus(grid, f'{tid}_lv', f'{tid.upper()} 0.69 kV', .69, x, y, 'turbine')
-    G.add_line(grid, f'{tid}_cable', plan['connect_bus'], mv, 'CAB33', km=plan['cable_km'], name=f'{tid.upper()} collector')
+    G.add_line(grid, f'{tid}_cable', plan['connect_bus'], mv, 'CAB33', km=plan['cable_km'], name=f'{tid.upper()} collector', route=plan.get('route'))
     G.add_transformer(grid, f'{tid}_tr', mv, lv, '33/0.69', round(m['mw']*1.12, 2), name=f'{tid.upper()} unit transformer')
     grid['turbines'][tid] = dict(id=tid, model=plan['model'], mw=m['mw'], rotor=m['rotor'], hub=m['hub'], x=x, y=y,
                                  farm=farm_id, bus_mv=mv, bus_lv=lv, status=status, age=age, maintained=world.minute,
@@ -210,9 +242,10 @@ def add_turbine(world, plan, status='ok', project=None, tid=None, age=0.):
 
 def add_storage(world, p):
     grid = world.grid
-    sub = world.substations[p['station']]
+    sub = world.substations.get(p['station']) or grid['buses'][p['connect_bus']]
+    bid = p.get('connect_bus') or sub['mv_bus']
     sid = f"bess{world.next_id('storage')}"
-    grid['storage'][sid] = dict(id=sid, name=f"Battery {sub['name']}", bus=sub['mv_bus'], station=p['station'],
+    grid['storage'][sid] = dict(id=sid, name=f"Battery {sub['name']}", bus=bid, station=p['station'],
                                 p_mw=float(p['p_mw']), e_mwh=float(p['e_mwh']), soc=.5, eff=.92, mode='auto', setpoint=0.,
                                 grid_forming=p['grid_forming'], forming_active=False, status='ok', p=0., x=sub['x']+.6,
                                 y=sub['y']-.5, cycles_mwh=0.)

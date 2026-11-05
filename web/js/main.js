@@ -118,8 +118,9 @@
     const st = PB.static; if (!st) return;
     $('buildbar').innerHTML = `<h4>BUILD</h4><select id="bmodel" title="Turbine model">${MODELS.map(m => `<option>${m}</option>`).join('')}</select>
       <button data-b="turbine">⚑ Wind turbine</button><button data-b="storage">▤ Battery</button><button data-b="line">╱ 110 kV line</button>
-      <button data-b="transformer">◫ Transformer</button>`;
+      <button data-b="transformer">◫ Transformer</button><button id="engineering">Engineering…</button>`;
     $('buildbar').querySelectorAll('[data-b]').forEach(b => b.onclick = () => PB.emit('build-start', b.dataset.b, {}));
+    $('engineering').onclick = () => PB.engineering.open();
   }
   function hint(text) { $('hint').textContent = text || ''; }
   function cancelBuild() { PB.building = null; hint(''); $('mapWrap').classList.remove('building'); $('buildbar').querySelectorAll('[data-b]').forEach(x => x.classList.remove('on')); }
@@ -169,6 +170,7 @@
     $('dok').onclick = async () => { closeDialog(); const ok = await PB.command({kind: 'build', build}); if (ok) { cancelBuild(); setDock('projects'); } };
     $('dno').onclick = () => { closeDialog(); if (PB.building && PB.building.type !== 'turbine') cancelBuild(); };
   }
+  PB.on('engineering-preview', preview);
   function setDock(t) { document.querySelector(`[data-dock="${t}"]`)?.click(); }
 
   // ------------------------------------------------------------ dialogs and menu

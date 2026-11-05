@@ -51,7 +51,7 @@ def worker(conn):
             plan = plan_build(w, dict(a['build']))
         except BuildError as exc:
             return dict(ok=False, error=str(exc))
-        return dict(ok=True, plan={k: v for k, v in plan.items() if k != 'connect_bus'})
+        return dict(ok=True, plan=plan)
 
     ops = dict(
         tick=tick, command=cmd, preview=preview, save=lambda w, a: w.state(),

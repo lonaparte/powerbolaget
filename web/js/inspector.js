@@ -113,7 +113,7 @@ PB.inspector = (() => {
         + `<h3>HVAC 220 KV · ${PB.esc(ac.name.toUpperCase())} · ${ac.capacity ? PB.fmt(ac.p, 1) + ' MW' : 'PLANNED'}</h3>`
         + `<ul class="list">${ac.cables.map(c => `<li class="click" data-goto="${c.id}">${PB.esc(PB.name(c.id))} ${statusChip(c.status)}<span class="small muted" style="margin-left:auto">${c.status === 'ok' ? PB.pct(c.loading) : ''}</span></li>`).join('')}</ul>`
         + `<ul class="list">${ac.stages.map(st => `<li>${st.done ? '✓' : '○'} ${PB.esc(st.date)}<span class="small muted" style="margin-left:auto">${st.cables} cable${st.cables > 1 ? 's' : ''} · ${PB.int(st.mw)} MW</span></li>`).join('')}</ul>`
-        + `<p class="small muted">The national grid operator builds the HVAC link (two 220 kV AC subsea cables, after the public Gotland connection plan: in service from 2031 = FE 6, 440 MW planned). It starts at a limited rating and grows as the mainland grid is reinforced. Once in service, the island is synchronous with the mainland and the HVDC runs on a schedule. If every connection is lost, only a grid-forming battery keeps the lights on.</p>`
+        + `<p class="small muted">You decide when to build or expand mainland connections. The synthetic mainland envelope allows 440 MW HVAC and 640 MW HVDC. Preview a project to see cost, lead time and island landing. HVAC supplies the voltage reference when connected; VSC-HVDC then follows its power schedule.</p><button class="button" id="linkEngineering">Plan connection…</button>`
         + `<label class="small">Operating margin (%) <input id="lmargin" type="number" min="0" max="30" step="1" value="${Math.round(d.margin * 100)}"></label>
         <div class="actions"><button class="button" data-cmd="margin">Apply</button>${pin('link')}</div>`;
     } else if (d.type === 'parcel') {
@@ -132,7 +132,12 @@ PB.inspector = (() => {
     } else if (d.type === 'project') {
       html = head(`Project · ${d.kind}`, d.title, null) + bar(d.progress) + kv([['Progress', PB.pct(d.progress)], ['Ready', PB.esc(d.finish)], ['Cost / paid', `${PB.msek(d.cost)} / ${PB.msek(d.paid)}`]]);
     }
+    if (['turbine','storage','branch'].includes(d.type) && d.id!=='hvdc') html += `<h3>ASSET WORK</h3><div class="actions">${['maintenance','retrofit','decommission'].map(a=>`<button class="button" data-work="${a}">${a}</button>`).join('')}</div><p class="small muted">Work locks the asset out. View cost and completion in projects; cancel an active order there.</p>`;
+    if (d.type==='project' && d.status==='building') html += `<button class="button" id="cancelProject">Cancel project</button>`;
     el.innerHTML = `<button class="button" data-back="1" style="float:right">✕</button>` + html;
+    el.querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>PB.command({kind:'asset_work',target:d.id,action:b.dataset.work}));
+    el.querySelector('#cancelProject')?.addEventListener('click',()=>PB.command({kind:'cancel_project',target:d.id}));
+    el.querySelector('#linkEngineering')?.addEventListener('click', () => PB.engineering.open({type:'interconnector'}));
     el.querySelectorAll('canvas.mini').forEach(c => {
       const kind = c.dataset.hist, h = d.history || [];
       const series = kind === 'pair' ? [{name: 'served', color: PB.css('--blue'), values: h.map(v => Array.isArray(v) ? v[0] : v)}, {name: 'unserved', color: PB.css('--red'), values: h.map(v => Array.isArray(v) ? v[1] : 0)}]

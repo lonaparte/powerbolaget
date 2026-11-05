@@ -58,7 +58,7 @@ def add_transformer(grid, bid, hv, lv, ttype, mva, **extra):
 
 def in_service(branch):
     """Closed, not tripped and not waiting for repair. A sectionalised feeder runs while its faulted section is repaired."""
-    return (branch['closed'] and not branch['tripped'] and not branch.get('planned')
+    return (branch['closed'] and not branch['tripped'] and not branch.get('planned') and not branch.get('retired')
             and (branch['repair_until'] is None or branch.get('section_out') is not None))
 
 
@@ -105,7 +105,8 @@ def model(grid, devices):
         if br['kind'] == 'line':
             r1, x1, c1, r0, x0, c0, amps, *_ = LINE_TYPES[br['type']]
             n = br['circuits']
-            elements.append(Line(br['id'], br['a'], br['b'], br['km'], r1/n, x1/n, r0/n, x0/n, c1*n, c0*n, amps*n,
+            rating = br.get('rating_factor',1.)
+            elements.append(Line(br['id'], br['a'], br['b'], br['km'], r1/n/rating, x1/n, r0/n/rating, x0/n, c1*n, c0*n, br.get('amps', amps*n),
                                  closed=in_service(br)))
         else:
             x, ll, nl = TRANSFORMER_TYPES[br['type']]

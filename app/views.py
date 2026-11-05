@@ -26,6 +26,7 @@ def static(world):
         zones=[dict(id=z['id'], name=z['name'], x=z['x'], y=z['y'], kind=z['kind'], bus=z['bus'], beds=z['beds'],
                     holiday_homes=z['holiday_homes'], amenity=z['amenity'], town=z.get('town', 0)) for z in world.zones],
         buses={b['id']: [b['name'], b['kv'], b['x'], b['y'], b['kind']] for b in grid['buses'].values()},
+        routes={b['id']: b['route'] for b in grid['branches'].values() if b.get('route')},
         branches={b['id']: [b['a'], b['b'], b['kind'], b['type'], b.get('km', 0.), b.get('circuits', 1), r(b['mva'], 1),
                             b.get('name', b['id'])] for b in grid['branches'].values()},
         turbines={t['id']: [t['model'], t['x'], t['y'], t['farm'], t['mw'], t['rotor'], t['hub']] for t in grid['turbines'].values()},
@@ -36,7 +37,7 @@ def static(world):
         hvac=dict(name=grid['hvac']['name'], station=grid['hvac']['station'], mainland=grid['hvac']['mainland'], cables=grid['hvac']['cables'],
                   stages=[dict(date=label(st['minute']).rsplit(' · ', 1)[0], cables=st['cables'], mw=st['mw']) for st in grid['hvac']['stages']]),
         firms={f['id']: [f['name'], f['kind'], f['sector'], f['zone'], f['bus']] for f in world.firms.values()},
-        catalog=dict(turbines=TURBINE_MODELS, lines={k: [v[8], v[7], v[6]] for k, v in G.LINE_TYPES.items() if k in ('OHL110', 'CAB110')},
+        catalog=dict(turbines=TURBINE_MODELS, lines={k: [v[8], v[7], v[6]] for k, v in G.LINE_TYPES.items() if k in ('OHL110', 'CAB110', 'OHL20', 'CAB20', 'CAB33')},
                      costs=COST, days=DAYS, goods={g: [u, p] for g, (u, p, _, _) in GOODS.items()}),
     )
 
@@ -123,7 +124,7 @@ def firm_power(world, f):
 
 def project_view(world, p):
     span = max(1, p['finish']-p['start'])
-    return dict(id=p['id'], kind=p['kind'], title=p['title'], zone=p.get('zone'), progress=r(min(1., (world.minute-p['start'])/span), 3),
+    return dict(id=p['id'], kind=p['kind'], status=p['status'], title=p['title'], zone=p.get('zone'), progress=r(min(1., (world.minute-p['start'])/span), 3),
                 finish=label(p['finish']), cost=r(p['cost']/1e6, 1), paid=r(p['paid']/1e6, 1), owner=p.get('owner', 'pb'))
 
 
@@ -200,8 +201,7 @@ def entity(world, eid):
                     reference='AC mainland grid' if grid['source_bus'] == 'mainland_ac' else 'HVDC converter',
                     hvdc=dict(poles=grid['link']['poles'], capacity=N.hvdc_capacity(world), p=r(f.get('link_dc', f.get('link', 0.)))),
                     hvac=dict(name=ac['name'], cables=cables, capacity=N.hvac_capacity(world), stage_mw=ac['capacity'], p=r(f.get('link_ac', 0.)),
-                              stages=[dict(date=label(st['minute']).rsplit(' · ', 1)[0], cables=st['cables'], mw=st['mw'], done=world.minute >= st['minute'])
-                                      for st in ac['stages']]))
+                              stages=[], player_controlled=True, mainland_limit=440.))
     if eid in world.projects:
         return dict(type='project', **project_view(world, world.projects[eid]))
     return None

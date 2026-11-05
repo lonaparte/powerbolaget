@@ -121,10 +121,7 @@ def build_hvac(world, grid):
     stages = [dict(minute=y*YEAR+d*DAY, cables=c, mw=mw) for y, d, c, mw in HVAC['stages']]
     grid['hvac'] = dict(station=[sx, sy], name=name, mainland=list(HVAC['mainland']), cables=cables, transformer='stk_t1',
                         links=['l_stk_lnk', 'l_stk_rom'], capacity=0., cable_mw=220., stages=stages)
-    for i, st in enumerate(stages):
-        world.events.push(st['minute'], 'interconnector', 'commission', stage=i)
-    world.projects['tso_hvac'] = dict(id='tso_hvac', kind='interconnector', owner='tso', title='HVAC 220 kV mainland link (grid operator)',
-                                      start=0, finish=stages[0]['minute'], cost=7.5e9, paid=0., status='building', zone='z05')
+    # Historical dates are metadata only. The player must commission a connection project.
 
 
 def create_pops(world):

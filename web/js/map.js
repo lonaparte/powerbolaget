@@ -269,6 +269,11 @@ PB.map = (() => {
     for (const [id, b] of Object.entries(st.branches)) {
       if (id === 'hvdc') continue;
       const [[x0, y0], [x1, y1]] = branchEnds(st, b);
+      const path = (st.routes?.[id] || []).map(p => toPx(...p));
+      const draw = (color, width, dash) => {
+        if (path.length < 2) return L(x0,y0,x1,y1,color,width,dash);
+        for (let i=1;i<path.length;i++) L(...path[i-1],...path[i],color,width,dash);
+      };
       if (Math.abs(x0 - x1) + Math.abs(y0 - y1) < 1) continue;
       const v = s.branches[id] || [0, 0, 0, 'ok'], kv = st.buses[b[0]][1], status = v[3];
       let col = kvColor(kv), width = kv >= 100 ? 2 : 1;
@@ -277,10 +282,10 @@ PB.map = (() => {
         col = layers.grid.loading ? loadingColor(v[2]) : kvColor(kv);
         if (layers.grid.islands && status === 'dead') col = '#555a6e';
       } else if (b[2] === 'line' && kv < 30 && view.z < 2.5) continue;
-      if (status === 'planned') { if (b[3] === 'CAB220' || mode === 'grid' || view.z >= 3) L(x0, y0, x1, y1, '#8a90a8', width, 3); continue; }
+      if (status === 'planned') { if (b[3] === 'CAB220' || mode === 'grid' || view.z >= 3) draw('#8a90a8', width, 3); continue; }
       if (b[3] === 'CAB220' && mode === 'island') col = css('--teal');
-      if (status === 'tripped' || status === 'repair' || status === 'open') { L(x0, y0, x1, y1, css('--red'), width, 2); continue; }
-      L(x0, y0, x1, y1, col, width);
+      if (status === 'tripped' || status === 'repair' || status === 'open') { draw(css('--red'), width, 2); continue; }
+      draw(col, width);
       if (mode === 'grid' && layers.grid.flow && status === 'ok') flowDots(x0, y0, x1, y1, v[0]);
       if (mode === 'island' && v[2] > .95 && (frame >> 3) & 1) L(x0, y0, x1, y1, css('--red'), width);
     }

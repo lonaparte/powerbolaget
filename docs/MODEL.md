@@ -211,6 +211,18 @@ Three views (island, grid, economy), map layers, a context inspector, parcel det
 Calibrated economic coefficients, tariff pass-through, the turbine dynamic model, HVAC and HVDC control choices, construction costs and durations, and load calibration against public annual statistics are all open. UI usability with students is still to be tested.
 # Confirmed retail and private finance rules
 
+The engineering dialog supports independent 110/20 or 110/33 kV stations, transformer sizing,
+electrical bus selection, 20/33/110 kV lines and routed collector cables. Route length enters both
+impedance and cost; voltage mismatch and overhead sea crossings are rejected. A new station is
+isolated until an incoming line actually connects it. Original automatic connections remain suggestions.
+
+Mainland links are player projects, with a synthetic contracted envelope of 640 MW HVDC / 440 MW HVAC.
+Connection capacity, island landing, 3/4-year lead times and cost are explicit assumptions. Historical
+Gotland commissioning dates are background metadata and never trigger construction. Old saves retain
+commissioned capacity but pending external commissioning events are cancelled. Asset work locks out
+equipment; cancellation retains sunk costs. Refurbishment restores condition (turbine nameplate is
+unchanged); battery replacement adds 10% fresh energy capacity and conductor upgrades add 10% rating.
+
 Electricity billing and industrial scheduling use the same signed contract. Fixed prices are fixed
 until expiry. Indexed contracts use their signed hourly or previous-calendar-month reference plus
 markup and network fee. The financial view edits offers for future contracts; it cannot rewrite

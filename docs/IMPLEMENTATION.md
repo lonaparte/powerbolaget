@@ -50,3 +50,8 @@ without a public source are assumptions and must be visible as such in the model
   calendar-month price index, editable offer UI/API, bounded collateral/payroll credit, interest,
   repayment, credit-constrained input purchases and liquidation/job settlement. Validation: 34 Python
   tests passed; after UI integration the 10 affected Python tests and all 4 browser workflows passed.
+- Batch 3a: editable station/bus/transformer/line/collector plans, physical routed length and costs,
+  route rendering and engineering dialog; player-led interconnectors with capacity/landing/lead-time
+  constraints; legacy scheduled delivery removed; asset lockout, work, cancellation and retirement.
+  Validation: 38 Python tests and all 4 browser workflows passed. Oil backup, storage aging and
+  electrical event dynamics remain in the following batches.

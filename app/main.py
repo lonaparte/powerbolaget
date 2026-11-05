@@ -98,17 +98,23 @@ class Tick(Ref):
 
 class Build(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    type: Literal['turbine', 'storage', 'line', 'transformer']
+    type: Literal['turbine', 'storage', 'line', 'transformer', 'station', 'interconnector']
     model: Optional[str] = Field(default=None, max_length=12)
     x: Optional[float] = Field(default=None, ge=-60, le=160)
     y: Optional[float] = Field(default=None, ge=-60, le=160)
     station: Optional[str] = Field(default=None, pattern=ID)
-    p_mw: Optional[float] = Field(default=None, ge=1, le=100)
+    p_mw: Optional[float] = Field(default=None, ge=1, le=640)
+    connect_bus: Optional[str] = Field(default=None, pattern=ID)
+    route: Optional[list[list[float]]] = Field(default=None, min_length=2, max_length=128)
+    name: Optional[str] = Field(default=None, max_length=60)
+    mv_kv: Literal[20, 33] = 20
+    mva: float = Field(default=40., ge=5, le=200)
+    technology: Literal['HVDC', 'HVAC'] = 'HVAC'
     hours: Optional[float] = Field(default=None, ge=.5, le=8)
     grid_forming: bool = False
     a: Optional[str] = Field(default=None, pattern=ID)
     b: Optional[str] = Field(default=None, pattern=ID)
-    line_type: Literal['OHL110', 'CAB110'] = 'OHL110'
+    line_type: Literal['OHL110', 'CAB110', 'OHL20', 'CAB20', 'CAB33'] = 'OHL110'
 
 
 class RetailPolicy(BaseModel):
@@ -124,7 +130,8 @@ class RetailPolicy(BaseModel):
 class Command(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_id: Optional[str] = Field(default=None, min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
-    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings', 'retail_policy']
+    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings', 'retail_policy', 'asset_work', 'cancel_project']
+    action: Optional[Literal['decommission','retrofit','maintenance']] = None
     category: Optional[Literal['household', 'industry', 'business']] = None
     policy: Optional[RetailPolicy] = None
     build: Optional[Build] = None
