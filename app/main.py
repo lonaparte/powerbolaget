@@ -1,145 +1,262 @@
-from contextlib import asynccontextmanager
-import hashlib
-import hmac
-import json
+"""Powerbolaget web service: one running world per browser session.
+
+The simulation core runs in worker processes (spec 10.1: headless core, client over HTTP; see
+app/runtime.py). Each player gets a world in memory while they play; their saves live in their own
+browser, which can always bring a world back by loading a save. Idle worlds are evicted; nothing is
+written to disk.
+"""
 import logging
 import os
-from pathlib import Path
 import secrets
 import threading
-from typing import Literal
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Literal, Optional
 from urllib.parse import urlparse
-from fastapi import FastAPI,HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel,ConfigDict,Field
-from .compute import Compute
-from .errors import RuleError
-from .parameters import LIMITATIONS, VERSION, WEATHER
-from .climate import reference as climate_reference
+from pydantic import BaseModel, ConfigDict, Field
+from . import __version__ as VERSION
+from .runtime import Gone, Rejected, Worker
+from .saves import SaveError, validate
 
-# Saves live in the player's browser. The server keeps nothing between requests: each request carries the
-# core state this server signed last time, and each reply carries the next signed state.
-DATA=Path(os.environ.get('COASTAL_DATA',str(Path(__file__).resolve().parent.parent/'data')))
-COMPUTE=Compute(); LOCK=threading.RLock(); KEY=b''
-# The browser keeps the chart history. The last step's metrics and snapshot stay signed: recomputing them
-# after the step has been committed would show a different dispatch for the same interval.
-DISPLAY=('history',)
-HISTORY=672
+MAX_SESSIONS = int(os.environ.get('POWERBOLAGET_MAX_SESSIONS', '8'))
+IDLE_SECONDS = int(os.environ.get('POWERBOLAGET_IDLE_SECONDS', '1800'))
+TICK_BUDGET_S = float(os.environ.get('POWERBOLAGET_TICK_BUDGET', '2.5'))
+WORKERS = [Worker() for _ in range(max(1, int(os.environ.get('POWERBOLAGET_WORKERS', '1'))))]
+MAX_BODY = 12_000_000
+ID = r'^[a-z0-9_]{1,48}$'
+SESSIONS: dict = {}          # session id -> [worker index, worker generation, last use]
+REGISTRY = threading.Lock()
 
-class Action(BaseModel):
-    model_config=ConfigDict(extra='forbid')
-    kind:Literal['new','advance','build','settings','weather','fault','repair','maintenance','plan_save','plan_build']
-    target:str=Field(default='',max_length=40,pattern=r'^[a-zA-Z0-9_]*$')
-    steps:int=Field(default=1,ge=1,le=672)
-    seed:int=Field(default=42,ge=0,le=1_000_000)
-    settings:dict=Field(default_factory=dict,max_length=7)
-    breaker_failure:bool=False
-    plan:dict|None=None
 
-class Replay(BaseModel):
-    model_config=ConfigDict(extra='forbid')
-    format:Literal['powergame.coastal.v2']
-    seed:int=Field(default=42,ge=0,le=1_000_000)
-    commands:list[Action]=Field(default_factory=list,max_length=2048)
-class ImportRequest(BaseModel): save:Replay
-class NewScenario(BaseModel): seed:int=Field(default=42,ge=0,le=1_000_000)
-class Signed(BaseModel):
-    model_config=ConfigDict(extra='forbid')
-    state:str=Field(max_length=500_000)
-    sig:str=Field(pattern=r'^[0-9a-f]{64}$')
-class CommandRequest(Signed): action:Action
-class PlanCheck(Signed): plan:dict
+def open_session(op, args):
+    """Start a world in the least busy worker; evict idle or oldest sessions beyond the limit."""
+    stale = []
+    with REGISTRY:
+        now = time.monotonic()
+        stale = [(sid, SESSIONS.pop(sid)) for sid in [s for s, x in SESSIONS.items() if now-x[2] > IDLE_SECONDS]]
+        while len(SESSIONS) >= MAX_SESSIONS:
+            oldest = min(SESSIONS, key=lambda s: SESSIONS[s][2])
+            stale.append((oldest, SESSIONS.pop(oldest)))
+        load = [sum(1 for x in SESSIONS.values() if x[0] == i) for i in range(len(WORKERS))]
+        index = load.index(min(load))
+    for sid, (i, _, _) in stale:
+        try:
+            WORKERS[i].call('drop', sid, None)
+        except (Gone, Rejected, RuntimeError):
+            pass
+    sid = secrets.token_urlsafe(18)
+    try:
+        result = WORKERS[index].call(op, sid, args)
+    except Rejected as exc:
+        raise HTTPException(400, str(exc))
+    with REGISTRY:
+        SESSIONS[sid] = [index, WORKERS[index].generation, time.monotonic()]
+    return dict(session=sid, **result)
 
-def signing_key():
-    """POWERBOLAGET_SECRET, or a key kept in the data folder. A new key only makes browsers rebuild saves from their replays."""
-    if os.environ.get('POWERBOLAGET_SECRET'): return os.environ['POWERBOLAGET_SECRET'].encode()
-    path=DATA/'state.key'
-    if not path.exists(): path.write_text(secrets.token_hex(32),encoding='utf-8')
-    return path.read_text(encoding='utf-8').strip().encode()
 
-def sign(text): return hmac.new(KEY,text.encode(),hashlib.sha256).hexdigest()
+def call(sid, op, args=None):
+    with REGISTRY:
+        entry = SESSIONS.get(sid)
+        if entry is not None:
+            entry[2] = time.monotonic()
+    gone = HTTPException(410, 'This game is no longer running on the server; it continues from your browser save.')
+    if entry is None or WORKERS[entry[0]].generation != entry[1]:
+        raise gone
+    try:
+        return WORKERS[entry[0]].call(op, sid, args or {})
+    except Gone:
+        with REGISTRY:
+            SESSIONS.pop(sid, None)
+        raise gone
+    except Rejected as exc:
+        raise HTTPException(400, str(exc))
 
-def unpack(payload):
-    if not hmac.compare_digest(sign(payload.state),payload.sig): raise HTTPException(409,'Save signature not recognised; rebuild it from its command history.')
-    g=json.loads(payload.state);g['history']=[]
-    return g
 
-def bundle(g):
-    """Signed core state, display data and the history rows produced by this call."""
-    rows=g.get('history',[]);g=dict(g,history=[])
-    core={k:v for k,v in g.items() if k not in DISPLAY}
-    view=COMPUTE.call('public',g);text=json.dumps(core,separators=(',',':'),allow_nan=False)
-    return dict(state=text,sig=sign(text),rows=rows,view={k:v for k,v in view.items() if k not in core and k!='history'})
+class New(BaseModel):
+    seed: int = Field(default=1, ge=0, le=1_000_000)
+
+
+class Load(BaseModel):
+    save: dict
+
+
+class Ref(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    session: str = Field(max_length=64)
+
+
+class Tick(Ref):
+    minutes: int = Field(ge=1, le=1440)
+    since_log: int = Field(default=0, ge=0)
+    grid_version: int = -1
+    firm_count: int = -1
+
+
+class Build(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    type: Literal['turbine', 'storage', 'line', 'transformer']
+    model: Optional[str] = Field(default=None, max_length=12)
+    x: Optional[float] = Field(default=None, ge=-60, le=160)
+    y: Optional[float] = Field(default=None, ge=-60, le=160)
+    station: Optional[str] = Field(default=None, pattern=ID)
+    p_mw: Optional[float] = Field(default=None, ge=1, le=100)
+    hours: Optional[float] = Field(default=None, ge=.5, le=8)
+    grid_forming: bool = False
+    a: Optional[str] = Field(default=None, pattern=ID)
+    b: Optional[str] = Field(default=None, pattern=ID)
+    line_type: Literal['OHL110', 'CAB110'] = 'OHL110'
+
+
+class Command(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    kind: Literal['build', 'maintenance', 'switch', 'storage_mode', 'settings']
+    build: Optional[Build] = None
+    target: Optional[str] = Field(default=None, pattern=ID)
+    closed: Optional[bool] = None
+    mode: Optional[Literal['auto', 'hold', 'charge', 'discharge']] = None
+    setpoint: Optional[float] = Field(default=None, ge=0, le=1000)
+    link_margin: Optional[float] = Field(default=None, ge=0, le=.3)
+
+
+class CommandRequest(Ref):
+    command: Command
+    since_log: int = Field(default=0, ge=0)
+
+
+class PreviewRequest(Ref):
+    build: Build
+
+
+class EntityRequest(Ref):
+    id: str = Field(max_length=48)
+
+
+class ParcelRequest(Ref):
+    x: float = Field(ge=-10, le=100)
+    y: float = Field(ge=-10, le=130)
+
+
+class TableRequest(Ref):
+    name: Literal['zones', 'pops', 'firms', 'markets', 'finance', 'demography', 'history', 'outlook']
+
 
 @asynccontextmanager
 async def lifespan(app):
-    global KEY
-    DATA.mkdir(parents=True,exist_ok=True);KEY=signing_key()
-    COMPUTE.call('create')
-    try: yield
-    finally: COMPUTE.close()
+    try:
+        yield
+    finally:
+        for w in WORKERS:
+            w.stop()
 
-app=FastAPI(title='Powerbolaget',version=VERSION,lifespan=lifespan)
+
+app = FastAPI(title='Powerbolaget', version=VERSION, lifespan=lifespan)
+
 
 @app.middleware('http')
-async def guard(request,call_next):
-    if request.method=='POST':
-        if request.headers.get('x-powergame')!='1': return JSONResponse({'detail':'Missing X-PowerGame header'},status_code=403)
-        origin=request.headers.get('origin')
-        if origin and urlparse(origin).netloc!=request.headers.get('host'): return JSONResponse({'detail':'Cross-origin write rejected'},status_code=403)
-        data=bytearray()
+async def guard(request, call_next):
+    if request.method == 'POST':
+        if request.headers.get('x-powergame') != '1':
+            return JSONResponse({'detail': 'Missing X-PowerGame header'}, status_code=403)
+        origin = request.headers.get('origin')
+        if origin and urlparse(origin).netloc != request.headers.get('host'):
+            return JSONResponse({'detail': 'Cross-origin write rejected'}, status_code=403)
+        data = bytearray()
         async for chunk in request.stream():
             data.extend(chunk)
-            if len(data)>1_000_000: return JSONResponse({'detail':'Save file exceeds 1 MB'},status_code=413)
-        request._body=bytes(data)
-    response=await call_next(request)
-    response.headers['Cache-Control']='no-store'
-    response.headers['X-Content-Type-Options']='nosniff'
+            if len(data) > MAX_BODY:
+                return JSONResponse({'detail': 'Request exceeds 12 MB'}, status_code=413)
+        request._body = bytes(data)
+    response = await call_next(request)
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
 
-@app.exception_handler(RuleError)
-async def rule_error(request,exc): return JSONResponse({'detail':str(exc)},status_code=400)
-@app.exception_handler(RuntimeError)
-async def runtime_error(request,exc):
-    logging.exception('Simulation failed',exc_info=exc)
-    return JSONResponse({'detail':str(exc)},status_code=503)
 
 @app.get('/api/health')
-def health(): return dict(status='ok',version=VERSION,solver='OpenDSSDirect.py 0.9.4',step_minutes=15)
+def health():
+    return dict(status='ok', version=VERSION, solver='OpenDSS (OpenDSSDirect.py)', sessions=len(SESSIONS),
+                workers=len(WORKERS), resolution='1 minute')
 
-@app.get('/api/reference')
-def reference():
-    """Fixed data the browser loads once per visit: model limitations, weather tests and the outlook constants."""
-    return dict(version=VERSION,limitations=LIMITATIONS,weather_options=WEATHER,climate=climate_reference())
 
-@app.post('/api/new')
-def new(payload:NewScenario):
-    with LOCK: return bundle(COMPUTE.call('create',payload.seed))
+@app.post('/api/session')
+def new_session(payload: New):
+    return open_session('new', dict(seed=payload.seed))
 
-@app.post('/api/resume')
-def resume(payload:Signed):
-    with LOCK: return bundle(unpack(payload))
+
+@app.post('/api/session/load')
+def load_session(payload: Load):
+    try:
+        state = validate(payload.save)
+    except SaveError as exc:
+        raise HTTPException(400, str(exc))
+    try:
+        return open_session('load', dict(state=state))
+    except RuntimeError as exc:
+        logging.error('Save could not be loaded: %s', exc)
+        raise HTTPException(400, 'This save could not be loaded.')
+
+
+@app.post('/api/tick')
+def tick(payload: Tick):
+    return call(payload.session, 'tick', dict(minutes=payload.minutes, since_log=payload.since_log, budget=TICK_BUDGET_S,
+                                              grid_version=payload.grid_version, firm_count=payload.firm_count))
+
 
 @app.post('/api/command')
-def command(payload:CommandRequest):
-    action=payload.action.model_dump()
-    if action['kind']=='new': raise RuleError('Start a new scenario from the saves menu.')
-    with LOCK: return bundle(COMPUTE.call('apply',unpack(payload),action))
+def run_command(payload: CommandRequest):
+    cmd = payload.command.model_dump(exclude_none=True)
+    if 'build' in cmd:
+        cmd['build'] = {k: v for k, v in cmd['build'].items() if v is not None}
+    return call(payload.session, 'command', dict(command=cmd, since_log=payload.since_log))
 
-@app.post('/api/plan/validate')
-def validate_plan(payload:PlanCheck):
-    with LOCK: return COMPUTE.call('check_plan',unpack(payload),payload.plan)
 
-@app.post('/api/import')
-def import_save(payload:ImportRequest):
-    replay=payload.save.model_dump()
-    if any(a['kind']=='new' for a in replay['commands']) or sum(a['steps'] for a in replay['commands'] if a['kind']=='advance')>35040:
-        raise RuleError('Replay contains a new-scenario command or exceeds one year.')
-    with LOCK:
-        g=COMPUTE.call('create',replay['seed']);history=[]
-        for a in replay['commands']:
-            g=COMPUTE.call('apply',dict(g,history=[]),a);history=(history+g['history'])[-HISTORY:]
-        return bundle(dict(g,history=history))
+@app.post('/api/preview')
+def preview(payload: PreviewRequest):
+    return call(payload.session, 'preview', dict(build={k: v for k, v in payload.build.model_dump().items() if v is not None}))
 
-app.mount('/',StaticFiles(directory=Path(__file__).resolve().parent.parent/'web',html=True),name='web')
+
+@app.post('/api/save')
+def save(payload: Ref):
+    return call(payload.session, 'save')
+
+
+@app.post('/api/entity')
+def entity(payload: EntityRequest):
+    out = call(payload.session, 'entity', dict(id=payload.id))
+    if out is None:
+        raise HTTPException(404, 'Unknown object.')
+    return out
+
+
+@app.get('/api/land')
+def land_grid():
+    """The island's parcels (land use and zone of every 0.5 km cell) and its long-term mean wind field."""
+    from .land import encoded
+    from .windfield import FIELD
+    return dict(encoded(), wind={k: FIELD[k] for k in ('x0', 'y0', 'cell_km', 'nx', 'ny', 'values', 'height_m', 'source')})
+
+
+@app.post('/api/parcel')
+def parcel(payload: ParcelRequest):
+    out = call(payload.session, 'parcel', dict(x=payload.x, y=payload.y))
+    if out is None:
+        raise HTTPException(404, 'Outside the map.')
+    return out
+
+
+@app.post('/api/table')
+def table(payload: TableRequest):
+    return call(payload.session, 'table', dict(name=payload.name))
+
+
+@app.exception_handler(RuntimeError)
+async def failed(request, exc):
+    logging.error('Simulation failed: %s', exc)
+    return JSONResponse({'detail': 'The simulation failed; the error is in the server log.'}, status_code=503)
+
+
+app.mount('/', StaticFiles(directory=Path(__file__).resolve().parent.parent/'web', html=True), name='web')

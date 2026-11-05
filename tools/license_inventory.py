@@ -11,6 +11,7 @@ import hashlib,json,re
 import httpx
 from deps import groups
 ROOT=Path(__file__).resolve().parents[1]
+VERSION=re.search(r"__version__ = '([^']+)'",(ROOT/'app/__init__.py').read_text(encoding='utf-8')).group(1)
 WORK=ROOT.parent
 OUT=ROOT/'licenses';OUT.mkdir(exist_ok=True)
 
@@ -75,7 +76,7 @@ for filename,url in urls.items():
     content=path.read_bytes()
     evidence.append(dict(file=str(path.relative_to(ROOT)),source=url,sha256=hashlib.sha256(content).hexdigest()))
 report=dict(date='2026-10-11',scope='Pinned installed Python distributions, legacy npm lock and declared native dependencies; not a complete binary symbol-level SBOM.',
-            project_name='Powerbolaget',project_version='0.0.1',project_license='MIT (included in release; original copyright retained)',current_python_count=len(current),runtime_python_count=len(runtime),python=packages,legacy_node=node,native_evidence=evidence,
+            project_name='Powerbolaget',project_version=VERSION,project_license='MIT (included in release; original copyright retained)',current_python_count=len(current),runtime_python_count=len(runtime),python=packages,legacy_node=node,native_evidence=evidence,
             native_components=[
                 dict(name='EPRI OpenDSS / DSS C-API',license='BSD-3-Clause',evidence='licenses/native/OpenDSS-EPRI-LICENSE.txt'),
                 dict(name='KLUSolveX 1.0.0a1 + KLU/BTF (SuiteSparse 5.6.0)',license='LGPL-2.1-or-later',evidence='DSS C-API 0.14.5 Windows build pins KLUSolveX 1.0.0a1; its README carries component notices'),
@@ -88,7 +89,7 @@ report=dict(date='2026-10-11',scope='Pinned installed Python distributions, lega
                 dict(name='libwinpthread-1.dll',license='MinGW-w64 winpthreads MIT/BSD-style notices; exact wheel build notice not included in wheel metadata',status='binary redistributor must retain exact MinGW runtime notices'),
             ])
 (ROOT/'results/license-inventory.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
-lines=['Powerbolaget 0.0.1 — Third-party license inventory (2026-10-11)',
+lines=[f'Powerbolaget {VERSION} — Third-party license inventory ({__import__("datetime").date.today().isoformat()})',
  'Scope: installed pinned Python packages, the legacy npm lockfile, and reviewed native-library notices. This is not a complete binary-level SBOM.',
  'The frontend uses native HTML / CSS / JavaScript / SVG without a new framework. NASA POWER provides climate calibration data; ORBIT / SAM / NREL reports are methodological references rather than imported libraries.',
  'This source release does not distribute Python, DLLs, .venv, Godot or node_modules. Original license texts are retained below.',

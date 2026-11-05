@@ -4,8 +4,7 @@ FROM python:3.12-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     OMP_NUM_THREADS=1 \
-    OPENBLAS_NUM_THREADS=1 \
-    COASTAL_DATA=/data
+    OPENBLAS_NUM_THREADS=1
 
 WORKDIR /app
 COPY requirements.lock pyproject.toml ./
@@ -23,8 +22,6 @@ COPY pytest.ini LICENSE THIRD-PARTY-NOTICES.txt ./
 COPY licenses ./licenses
 RUN groupadd --gid 10001 game \
     && useradd --uid 10001 --gid game --no-create-home game \
-    && mkdir /data \
-    && chown game:game /data \
     && chmod -R a+rX /app
 
 USER 10001:10001

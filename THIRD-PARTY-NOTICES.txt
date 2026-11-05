@@ -1,4 +1,4 @@
-Powerbolaget 0.0.1 — Third-party notices
+Powerbolaget 0.1.0 — Third-party notices
 
 Original project code remains subject to the existing MIT LICENSE, including
 Copyright (c) 2026 PowerGame contributors. This notice does not relicense dependencies.
@@ -27,15 +27,28 @@ An installer that bundles native binaries needs its own exact-binary notice
 and corresponding-source / relinking review, including MinGW and Free Pascal
 runtime notices not fully inventoried by Python wheel metadata.
 
-Baltic coastal climate calibration:
-NASA POWER, 2001-2020 gridded monthly climatology at 55.6761 N, 12.5683 E.
-Parameters WS10M, T2M, ALLSKY_SFC_SW_DWN.
+Island climate calibration:
+NASA POWER Climatology API (community RE), 2001-2025 gridded monthly
+climatology at 57.5 N, 18.5 E. Parameters WS10M, WS50M, T2M,
+ALLSKY_SFC_SW_DWN, RH2M. Source, period and retrieval date are stored in
+app/island-climatology.json. Wind variability, persistence and the wind rose
+are fitted to NASA POWER hourly data (WS10M, WD10M, T2M, 2020-2024) at the same
+point; the daily temperature range follows Visby station averages published at
+https://www.weatherandclimate.eu/climate/02590. Only summary statistics are
+stored, in app/weather.py.
+
+Island wind field: Global Wind Atlas, mean wind speed at 100 m (country GeoTIFF
+for Sweden), averaged over 1 km cells by tools/wind_atlas.py and stored in
+app/island-wind.json. Licensed CC BY 4.0. The Global Wind Atlas is developed by
+DTU Wind Energy in partnership with the World Bank Group, with funding from
+ESMAP. https://globalwindatlas.info
 The stored monthly values calibrate continuous seasonal functions; the game
 generates synthetic weather using smooth seeded disturbances.
 https://power.larc.nasa.gov/docs/services/api/temporal/climatology/
-The climate function and construction scheduler are original project code.
-NREL turbine reports, SAM documentation and ORBIT scheduling documentation
-are references only; OpenFAST, SAM and ORBIT are not imported or bundled.
+The weather functions, wake model and turbine power curves are original
+project code. Island outline, zones, firms and grid are fictional; public
+Svenska kraftnaet project pages on the Gotland AC connection are references
+for the interconnector timing only. No data from them is redistributed.
 
 Retained legacy project (outside this source release): Godot 4.4.1 (MIT plus
 its third-party copyright file), UrbanSim 3.3 (BSD-3-Clause), pandas and other

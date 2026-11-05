@@ -80,7 +80,33 @@ class Generator:
     kind = 'generator'
 
 
-Element = Union[Transformer, Line, Load, Generator]
+@dataclass(frozen=True)
+class GridFormer:
+    """A converter that can form the voltage of an electrical island (out of service until enabled)."""
+    name: str
+    bus: str
+    kv: float
+    mvasc: float
+    pu: float = 1.0
+    kind = 'vsource'
+
+
+Element = Union[Transformer, Line, Load, Generator, GridFormer]
+
+
+@dataclass
+class Results:
+    """One converged snapshot, in MW, Mvar, A and per unit. Branch tuples: (P1, Q1, P2, Q2, Imax) with
+    P1/Q1 entering terminal 1 and P2/Q2 entering terminal 2; a branch's losses are P1 + P2."""
+    converged: bool
+    iterations: int
+    bus_vm: dict
+    bus_va: dict
+    branches: dict
+    source_p_mw: float
+    source_q_mvar: float
+    losses_mw: float
+    formers: dict = field(default_factory=dict)   # grid-forming sources: {name: (P MW, Q Mvar) injected}
 
 
 @dataclass
@@ -103,6 +129,15 @@ class Solver(Protocol):
 
     def set_load(self, name: str, kw: float, pf: float) -> None:
         """Set a load's active power and power factor."""
+
+    def set_tap(self, name: str, tap: float) -> None:
+        """Per-unit tap of a transformer's low-voltage winding (above 1 raises the low-voltage side)."""
+
+    def set_powers(self, loads: dict, generators: dict) -> None:
+        """Set many injections at once: {name: (kW, kvar)}; generator kW may be negative (charging)."""
+
+    def results(self) -> Results:
+        """Every bus voltage and branch flow of the last solution."""
 
     def solve(self) -> bool:
         """Run a snapshot AC power flow and report whether it converged."""

@@ -1,35 +1,41 @@
-Powerbolaget 0.0.1 development tree / 2026-10-12
+Powerbolaget 0.1.0 development tree / 2026-11-04
 Project root: .
-Lists source, tests, configuration, documentation, screenshots, examples and license evidence.
-Collapses installed dependencies, runtime data and backups; ignores Python, pytest and tool caches.
-Screenshots show the current English interface.
+Lists source, tests, configuration, documentation, results and license evidence.
+Collapses installed dependencies and runtime data; ignores Python, pytest and tool caches.
 
-Powerbolaget-0.0.1/
+Powerbolaget-0.1.0/
 ├── app/
 │   ├── solvers/
 │   │   ├── __init__.py
 │   │   ├── model.py
 │   │   └── opendss.py
 │   ├── __init__.py
-│   ├── baltic-coastal-climatology.json
-│   ├── climate.py
-│   ├── compute.py
+│   ├── calendar.py
 │   ├── construction.py
-│   ├── engine.py
-│   ├── errors.py
+│   ├── economy.py
+│   ├── energy.py
+│   ├── events.py
+│   ├── grid.py
+│   ├── island-climatology.json
+│   ├── island-wind.json
+│   ├── island.py
+│   ├── land.py
+│   ├── ledger.py
+│   ├── loads.py
 │   ├── main.py
-│   ├── network.py
-│   ├── parameters.py
-│   ├── planning.py
-│   ├── protection.py
-│   ├── wind.py
-│   └── worker.py
+│   ├── params.py
+│   ├── rng.py
+│   ├── runtime.py
+│   ├── saves.py
+│   ├── society.py
+│   ├── views.py
+│   ├── weather.py
+│   ├── windfield.py
+│   ├── world.py
+│   └── worldgen.py
 ├── docs/
 │   ├── MODEL.md
 │   └── VALIDATION.md
-├── examples/
-│   ├── baltic-one-day-140.json
-│   └── expanded-day-182.json
 ├── licenses/
 │   ├── annotated-types/
 │   │   └── LICENSE
@@ -110,41 +116,37 @@ Powerbolaget-0.0.1/
 │   └── uvicorn/
 │       └── LICENSE.md
 ├── results/
-│   ├── annual-replay.json
-│   ├── annual-validation.json
-│   ├── browser-validation.json
-│   ├── docker-pytest.txt
-│   ├── docker-validation.json
-│   ├── license-inventory.json
-│   ├── linux-pytest.txt
-│   ├── linux-validation.json
-│   ├── pytest.txt
-│   └── rename-validation.json
+│   ├── benchmark-365d.json
+│   └── license-inventory.json
 ├── tests/
-│   ├── browser_saves.cjs
-│   ├── endurance.py
+│   ├── browser_game.cjs
+│   ├── conftest.py
 │   ├── test_api.py
-│   ├── test_browser_climate.py
-│   ├── test_model.py
-│   ├── test_planning_climate.py
-│   └── test_solvers.py
+│   ├── test_core.py
+│   ├── test_solvers.py
+│   └── test_world.py
 ├── tools/
+│   ├── benchmark.py
 │   ├── deps.py
 │   ├── development_tree.py
 │   ├── license_inventory.py
 │   ├── package.py
-│   └── pixel_font.py
+│   ├── pixel_font.py
+│   └── wind_atlas.py
 ├── web/
+│   ├── js/
+│   │   ├── chart.js
+│   │   ├── core.js
+│   │   ├── econ.js
+│   │   ├── inspector.js
+│   │   ├── main.js
+│   │   └── map.js
 │   ├── app.js
-│   ├── climate.js
 │   ├── index.html
 │   ├── pixel-font.woff
-│   ├── pixel.js
-│   ├── planner.css
-│   ├── planner.js
-│   ├── saves.js
 │   └── style.css
 ├── .dockerignore
+├── .gitignore
 ├── compose.yaml
 ├── DEVELOPMENT-TREE.txt
 ├── Dockerfile
